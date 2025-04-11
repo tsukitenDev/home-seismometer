@@ -1,32 +1,24 @@
-# Prerequisites
-*.d
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
 
-# Precompiled Headers
-*.gch
-*.pch
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+/main/seismometer/shindo_iir_filter.*
 
-# Fortran module files
-*.mod
-*.smod
+# production
+/build
+/build/*
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
 
-# Executables
-*.exe
-*.out
-*.app
+/sdkconfig?*
+
+#components
+/managed_components
+/managed_components/*
+
+/fatfs_long_name_image/*.csv
+
+/memo*
+/test*
+
+.DS_Store
+.vscode

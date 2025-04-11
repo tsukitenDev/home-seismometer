@@ -1,0 +1,4 @@
+dependencies:
+  espressif/mdns: "*"
+  espressif/esp-dsp: "*"
+  espressif/led_strip: "^2.4.1"
