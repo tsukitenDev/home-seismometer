@@ -9,6 +9,11 @@ ESP32用のWeb UIを備えた地震計ファームウェア
 - [ ] 地震履歴の保存、表示
 - [x] シリアル経由のWiFiプロビジョニング ([Improv Wi-Fi](https://www.improv-wifi.com/))
 
+震度：
+
+処理の制約のため、約40秒間の加速度データから計算します。
+
+
 ## 対応ボード・センサー
 ボード
 - EQIS-1 (Seeeduino XIAO ESP32S3)
