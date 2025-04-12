@@ -22,7 +22,7 @@ void ImprovSerial::setup(const std::string firmware,
     this->hardware_variant_ = variant;
     this->device_name_      = name;
 
-    this->device_url_       = std::string("http://") + url;                        
+    this->device_url_       = url;                        
   
     this->uart_num_ = uart_num;
 
