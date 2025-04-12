@@ -6,7 +6,8 @@ LSM6DSO::LSM6DSO(){
     scale_factor = 0.000'061; // g/LSB
 };
 
-void LSM6DSO::init(spi_host_device_t host, gpio_num_t pin_cs){
+bool LSM6DSO::init(spi_host_device_t host, gpio_num_t pin_cs){
+    bool res = false;
     // spi_device_handleを取得するための設定
     spi_device_interface_config_t devcfg_lsm6dso = {
         .command_bits = 8,
@@ -24,6 +25,7 @@ void LSM6DSO::init(spi_host_device_t host, gpio_num_t pin_cs){
     uint8_t dat;
     IO_Read(WHO_AM_I, dat);
     if(dat == 0b01101100u){
+        res = true;
         ESP_LOGI("LSM6DSO", "connection OK");
     }
     IO_Write(CTRL1_XL, uint8_t(0b01000010u)); // CTRL1_XL 104hz, 2g, LPF2_XL 有効
@@ -32,6 +34,7 @@ void LSM6DSO::init(spi_host_device_t host, gpio_num_t pin_cs){
     //assert(dat == 0b01100010u) 
     IO_Write(CTRL8_XL, 0); // LPF2: ODR / 4
     //IO_Write(LSM6DSO_REG::CTRL8_XL, 0b0100'0000u); // LPF2: ODR / 20
+    return res;
 };
 
 

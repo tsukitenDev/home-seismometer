@@ -109,7 +109,7 @@ static std::string device_name = "CYD";
 static std::string sensor_name = "ADXL355";
 std::string mdns_hostname =  "adxl";
 std::string mdns_instancename =  "CYD ESP32 Webserver";
-static std::string monitor_url = "http://adxl.local/monitor";
+static std::string monitor_url = "adxl.local/monitor";
 
 #elif BOARD_EQIS1 == 1
 static LGFX_EQIS1_SSD1306 lcd;
@@ -258,8 +258,12 @@ void task_process_shindo_fft(void * pvParameters){
 }
 
 
+bool is_sensor_connected = false;
+bool is_sensor_connect_failed = false;
 
-
+bool is_shindo_stabilized = false;
+int32_t min_shindo = 100;
+int64_t last_cnt = 0;
 
 void task_acc_read_fft(void * pvParameters){
     const char *TAG = "ACC";
@@ -267,13 +271,15 @@ void task_acc_read_fft(void * pvParameters){
     // 加速度センサー設定
     #if BOARD_355_1732S019 == 1
     ADXL355 sensor;
-    sensor.init(SPI2_HOST, PIN_NUM_CS);
+    is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
     #elif BOARD_EQIS1 == 1
     LSM6DSO sensor;
-    sensor.init(SPI2_HOST, PIN_NUM_CS);
+    is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
     #endif
+
+    is_sensor_connect_failed = !is_sensor_connected;
 
     // 初期化
     seismometer_void processer(sensor);
@@ -307,6 +313,8 @@ void task_acc_read_fft(void * pvParameters){
         if(shindo_fft_res == pdPASS){
             is_start_shindo = true;
             intensity_int10x = fft_res_intensity;
+            if(intensity_int10x < min_shindo) min_shindo = intensity_int10x;
+            if(min_shindo < 20) is_shindo_stabilized = true;
         }
         if(is_start_shindo) shindo_history[cnt] = {now, intensity_int10x};  
 
@@ -338,9 +346,147 @@ void task_acc_read_fft(void * pvParameters){
             }
         }
         last_read = now;
+        last_cnt = cnt;
         xTaskDelayUntil(&xLastTime, 10 / portTICK_PERIOD_MS);
     }
 }
+
+
+void task_display(void * pvParameters){
+    canvas.setPsram(true);
+    canvas.setTextWrap(false);
+    canvas.createSprite(lcd.width(), lcd.height());
+
+    int64_t cnt = 0;
+    std::string wifi_status;
+    std::string sensor_status;
+    std::string seis_status;
+    WIFI_STATE wifi_current_state;
+    
+    int display_intensity = 0;
+    std::string shindo_text;
+
+    std::string spinner =  "|/-\\";
+
+    int32_t display_mode = 0; // 0: ステータス  1: 震度拡大  2: 待機
+
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    while(1) {
+        wifi_current_state = wifi_get_state();
+        if(wifi_current_state == WIFI_STATE::NOT_CONFIGURED) wifi_status = "Not Configured";
+        if(wifi_current_state == WIFI_STATE::CONFIGURED)     wifi_status = "Configured";
+        if(wifi_current_state == WIFI_STATE::CONNECTING)     wifi_status = "Connecting";
+        if(wifi_current_state == WIFI_STATE::CONNECTED)      wifi_status = "Connected";
+        if(wifi_current_state == WIFI_STATE::CONNECT_FAILED) wifi_status = "Connect Failed";
+        if(wifi_current_state == WIFI_STATE::NOT_CONNECTED)  wifi_status = "Not Connected";
+
+        if(is_sensor_connected) sensor_status = "Connected";
+        else if(is_sensor_connect_failed) sensor_status = "Connect Failed";
+        else sensor_status = "";
+
+        if(!is_sensor_connected) seis_status = "";
+        else if(is_shindo_stabilized) seis_status = "Stabilized";
+        else seis_status = "Stabilizing";
+
+
+        cnt = last_cnt;
+        int intensity_int10x = std::get<1>(shindo_history[cnt]);
+
+        // 最大震度を表示する
+        if(display_intensity < intensity_int10x) display_intensity = intensity_int10x;
+
+        // check
+        // display_mode = 1;
+        // display_intensity = ((cnt / 100) * 5 ) % 80;
+
+        if(display_intensity < 5) {
+            shindo_text = "0 ";
+        }else if(display_intensity < 15) {
+            shindo_text = "1 ";
+        }else if(display_intensity < 25) {
+            shindo_text = "2 ";
+        }else if(display_intensity < 35) {
+            shindo_text = "3 ";
+        }else if(display_intensity < 45) {
+            shindo_text = "4 ";
+        }else if(display_intensity < 50) {
+            shindo_text = "5-";
+        }else if(display_intensity < 55) {
+            shindo_text = "5+";
+        }else if(display_intensity < 60) {
+            shindo_text = "6-";
+        }else if(display_intensity < 65) {
+            shindo_text = "6+";
+        }else{
+            shindo_text = "7 ";
+        }
+
+        if(display_mode == 0) {
+
+            float gal_x = std::get<1>(raw_acc_buffer[cnt])[0];
+            float gal_y = std::get<1>(raw_acc_buffer[cnt])[1];
+            float gal_z = std::get<1>(raw_acc_buffer[cnt])[2];
+            float shindo = (float)intensity_int10x / 10;
+
+            canvas.setFont(&fonts::Font0);
+            canvas.fillScreen(TFT_BLACK);
+            canvas.setCursor(0,0);
+            canvas.printf("%s\n", monitor_url.c_str());
+            canvas.printf("WiFi : %s\n", wifi_status.c_str());
+            canvas.printf("Acc  : %s\n", sensor_status.c_str());
+            canvas.printf("seis : %s\n", seis_status.c_str());
+            canvas.printf("\n");
+            canvas.printf("X      Y      Z cm/s2\n");
+            canvas.printf("%6.1f %6.1f %6.1f\n", gal_x, gal_y, gal_z);
+            if(is_shindo_stabilized) canvas.printf("shindo %.1f", shindo);    
+
+            canvas.pushSprite(0, 0);
+            if(is_shindo_stabilized && cnt > 120 * 100) display_mode = 2;
+        }else if(display_mode == 1) {
+            canvas.setFont(&fonts::Font0);
+            canvas.setTextSize(1);
+            canvas.fillScreen(TFT_BLACK);
+            canvas.setCursor(0,0);
+            canvas.printf("%s\n", monitor_url.c_str());
+            canvas.setCursor(0, canvas.height() - canvas.fontHeight() * 2 - 6);
+            canvas.printf(" Seismic\n Intensity");
+            // 過去の震度を表示しているときは*マークを表示
+            if(intensity_int10x + 5 < display_intensity) canvas.printf("*");
+            canvas.setFont(&fonts::Font6);
+            canvas.setCursor(canvas.width() - canvas.textWidth("00") + 4,
+                             canvas.height() - canvas.fontHeight() + 6);
+            canvas.printf("%c", shindo_text[0]);
+            canvas.setFont(&fonts::Font4);
+            canvas.setTextSize(2);
+            canvas.setCursor(canvas.getCursorX() + 2, canvas.getCursorY());
+            canvas.printf("%c", shindo_text[1]);
+            
+            // フリーズ確認
+            if((cnt / 100) % 2 == 1) canvas.drawPixel(canvas.width() - 1, canvas.height() - 1, TFT_WHITE);
+            
+            canvas.pushSprite(0, 0);
+            if(intensity_int10x < 15) {
+                // 最大震度はリセット
+                display_intensity = 0;
+                display_mode = 2;
+            }
+            
+        }else if(display_mode == 2) {
+            canvas.setFont(&fonts::Font0);
+            canvas.setTextSize(1);
+            canvas.fillScreen(TFT_BLACK);
+            canvas.setCursor(canvas.width() - canvas.textWidth("-") - 2, canvas.height() - canvas.fontHeight() - 2);
+            // フリーズ確認
+            canvas.printf("%c", spinner[(cnt / 100) % 4]);
+            canvas.pushSprite(0, 0);
+            if(intensity_int10x > 15) display_mode = 1;
+        }
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    }
+}
+
+
 
 
 extern "C" void app_main(void)
@@ -354,12 +500,11 @@ extern "C" void app_main(void)
     #elif BOARD_EQIS1 == 1
     lcd.setRotation(2);
     #endif
-    canvas.setPsram(true);
-    canvas.setTextWrap(false);
-    canvas.createSprite(lcd.width(), lcd.height());
 
 
     BaseType_t create_task_result;
+
+
 
     #if BOARD_355_1732S019 == 1
     // 輝度調整　割り込み設定
@@ -386,6 +531,9 @@ extern "C" void app_main(void)
     ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
     ESP_ERROR_CHECK(ret);
 
+
+    create_task_result = xTaskCreatePinnedToCore(task_display, "display task", 4096, NULL, 1, NULL, 0);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
 
     // NVS領域　初期設定
@@ -434,26 +582,5 @@ extern "C" void app_main(void)
 
     while(1) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        std::string ssid = "";
-        if(wifi_is_connected()){
-            wifi_ap_record_t ap_record;
-            esp_err_t res = esp_wifi_sta_get_ap_info(&ap_record);
-            if(res == ESP_OK) {
-                ssid = std::string(reinterpret_cast<char*>(ap_record.ssid));
-            }
-        }
-        canvas.fillScreen(TFT_BLACK);
-        canvas.setCursor(0, 0);
-        canvas.println(ssid.c_str());
-        canvas.println(monitor_url.c_str());
-
-        time_t now;
-        struct tm timeinfo;
-        time(&now);
-        char strftime_buf[64];
-        localtime_r(&now, &timeinfo);
-        strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-        canvas.println(strftime_buf);
-        canvas.pushSprite(0, 0);
     }
 }

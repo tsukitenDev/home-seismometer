@@ -8,7 +8,8 @@ ADXL355::ADXL355(void){
     scale_factor = 0.000'003'9; // g/LSB
 };
 
-void ADXL355::init(spi_host_device_t host, gpio_num_t pin_cs){
+bool ADXL355::init(spi_host_device_t host, gpio_num_t pin_cs){
+            bool res = false;
             // spi_device_handleを取得するための設定
             spi_device_interface_config_t devcfg_adxl355 = {
                 .command_bits = 8,
@@ -26,6 +27,7 @@ void ADXL355::init(spi_host_device_t host, gpio_num_t pin_cs){
             uint8_t dat;
             IO_Read(DEVID_AD, dat);
             if(dat == 0xAD){
+                res = true;
                 ESP_LOGI("ADXL355", "connection OK");
             }else{
                 ESP_LOGI("ADXL355", "connection NG");
@@ -33,6 +35,7 @@ void ADXL355::init(spi_host_device_t host, gpio_num_t pin_cs){
             }
             IO_Write(FILTER, uint8_t(0b000'0101u)); 
             IO_Write(POWER_CTL, uint8_t(0));
+            return res;
 };
 
 

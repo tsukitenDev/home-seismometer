@@ -83,8 +83,11 @@ static const char *TAG = "wifi station";
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 
+static bool is_configured = false;
+static bool is_connect_failed = false;
+
 static bool is_connected = false;
-static bool is_sta_connecting = true;
+static bool is_sta_connecting = false;
 
 static bool disconnecting = false;
 
@@ -97,7 +100,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     if (event_base != WIFI_EVENT) return;
     if (event_id == WIFI_EVENT_STA_START) {
         s_retry_num = 0;
-        is_sta_connecting = true;
+        //is_sta_connecting = true;
         esp_wifi_connect();
         return;
     }
@@ -118,6 +121,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "retry to connect to the AP");
         } else {
             is_sta_connecting = false;
+            is_connect_failed = true;
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             ESP_LOGI(TAG,"connect to the AP failed");
         }
@@ -199,6 +203,7 @@ void wifi_init_sta(void)
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     wifi_config_t currentConfig;
     esp_wifi_get_config(WIFI_IF_STA, &currentConfig);
+    if(currentConfig.sta.ssid[0] != '\0') is_configured = true;
     ESP_LOGI(TAG, "stored SSID %s  password ******  channel %d",
                   currentConfig.sta.ssid,
                   //currentConfig.sta.password,
@@ -227,6 +232,7 @@ bool wifi_connect_to_ap(std::string ssid, std::string password){
             pdFALSE,
             portMAX_DELAY);
         disconnecting = false;
+        is_connect_failed = false;
     }
 
 
@@ -251,7 +257,9 @@ bool wifi_connect_to_ap(std::string ssid, std::string password){
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     //ESP_ERROR_CHECK(esp_wifi_start() );
     s_retry_num = 0;
+    is_configured = true;
     is_sta_connecting = true;
+    is_connect_failed = false;
     esp_wifi_connect();
 
     // 接続待ち
@@ -458,4 +466,13 @@ void wifi_init(){
   start_mdns_service();
 
   return;
+}
+
+WIFI_STATE wifi_get_state(){
+    WIFI_STATE res = WIFI_STATE::NOT_CONFIGURED;
+    if(is_configured)     res = WIFI_STATE::NOT_CONNECTED;
+    if(is_sta_connecting) res = WIFI_STATE::CONNECTING;
+    if(is_connected)      res = WIFI_STATE::CONNECTED;
+    if(is_connect_failed) res = WIFI_STATE::CONNECT_FAILED;
+    return res;
 }

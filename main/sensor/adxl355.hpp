@@ -51,7 +51,7 @@ namespace ADXL355_VAL{
 class ADXL355: public Sensor_ACC {
     public:
         ADXL355(void);
-        void init(spi_host_device_t host, gpio_num_t pin_cs);
+        bool init(spi_host_device_t host, gpio_num_t pin_cs);
         void IO_Write(const uint8_t RegisterAddr, const uint8_t data) const;
         void IO_Read(const uint8_t RegisterAddr, uint8_t& data) const;
         void IO_Read_LH(const uint8_t RegisterAddr, int16_t* arr, const uint8_t len) const;
