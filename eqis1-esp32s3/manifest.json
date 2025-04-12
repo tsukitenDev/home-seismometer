@@ -1,0 +1,16 @@
+{
+    "name": "home-seismometer",
+    "version": "v0.1",
+    "builds": [
+      {
+        "chipFamily": "ESP32-S3",
+        "parts": [
+          {
+            "path": "merged-eqis1.bin",
+            "offset": 0
+          }
+        ]
+      }
+    ]
+  }
+  
