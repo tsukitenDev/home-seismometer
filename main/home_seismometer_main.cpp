@@ -248,8 +248,7 @@ void task_process_shindo_fft(void * pvParameters){
 
         int64_t st_a = esp_timer_get_time();
 
-        float res = processor.calc(cnt);
-        //ESP_LOGI("shindo", "%.2f", res);
+        int32_t res = processor.calc(cnt);
         
         int64_t st_b = esp_timer_get_time();
         //ESP_LOGW("shindo", "complete 3 FFT in %'lldus", st_b - st_a);
@@ -264,7 +263,6 @@ void task_process_shindo_fft(void * pvParameters){
 
 void task_acc_read_fft(void * pvParameters){
     const char *TAG = "ACC";
-    ESP_LOGI(TAG, "START");
 
     // 加速度センサー設定
     #if BOARD_355_1732S019 == 1
@@ -290,6 +288,10 @@ void task_acc_read_fft(void * pvParameters){
 
     int64_t last_read = esp_timer_get_time();
 
+    
+
+    ESP_LOGI(TAG, "START");
+
     while(1){
         int64_t now = esp_timer_get_time();
 
@@ -300,7 +302,7 @@ void task_acc_read_fft(void * pvParameters){
         raw_acc_buffer[cnt] = {now, res.gal_raw};
         hpf_acc_buffer[cnt] = {now, res.gal_hpf}; 
 
-        float fft_res_intensity;
+        int32_t fft_res_intensity;
         BaseType_t shindo_fft_res = xQueueReceive(que_shindo_res, &fft_res_intensity, 0);
         if(shindo_fft_res == pdPASS){
             is_start_shindo = true;
@@ -311,10 +313,8 @@ void task_acc_read_fft(void * pvParameters){
         
         if(is_start_shindo){
             if(cnt % 100 == 0){
-                ESP_LOGI(TAG, "shindo: %ld", //, shindo-iir: %ld",     
-                                  //esp_timer_get_time() - last_read, // 10,000us→10ms
-                                  intensity_int10x);
-                                //res.rt_intensity);
+                //int64_t diff = esp_timer_get_time() - last_read // 10,000us→10ms
+                ESP_LOGI(TAG, "shindo: %.1f", (double)intensity_int10x / 10);
                 // websocket 送信
                 xQueueSend(que_bufCount, &cnt, 0);
             }
@@ -359,10 +359,12 @@ extern "C" void app_main(void)
     canvas.createSprite(lcd.width(), lcd.height());
 
 
+    BaseType_t create_task_result;
+
     #if BOARD_355_1732S019 == 1
     // 輝度調整　割り込み設定
     gpio_evt_queue = xQueueCreate(10, 8);
-    xTaskCreate(gpio_task, "gpio task", 2048, NULL, 0, NULL);
+    create_task_result = xTaskCreate(gpio_task, "gpio task", 2048, NULL, 0, NULL);
 
     gpio_set_direction(PIN_VOLUME, GPIO_MODE_INPUT);
     gpio_set_pull_mode(PIN_VOLUME, GPIO_PULLUP_ONLY);
@@ -400,7 +402,8 @@ extern "C" void app_main(void)
     s_shindo_fft_event_group = xEventGroupCreate();
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    xTaskCreatePinnedToCore(task_process_shindo_fft, "process shindo", 4096, NULL, 1, NULL, 1);
+    create_task_result = xTaskCreatePinnedToCore(task_process_shindo_fft, "process shindo", 4096, NULL, 1, NULL, 1);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
     
     xEventGroupWaitBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_READY, pdFALSE, pdFALSE, portMAX_DELAY);
     
@@ -410,25 +413,22 @@ extern "C" void app_main(void)
 
 
 
-    print_heap_info();
-
-
-    xTaskCreatePinnedToCore(task_improv, "Task improv serial", 8192, NULL, 1, NULL, 0);
+    create_task_result = xTaskCreatePinnedToCore(task_improv, "Task improv serial", 8192, NULL, 1, NULL, 0);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
 
     // websocket 送信開始
     que_bufCount = xQueueCreate(8, 10);
-    xTaskCreatePinnedToCore(task_ws_send_data, "Task Send websocket", 8192, NULL, 1, NULL, 0);
+    create_task_result = xTaskCreatePinnedToCore(task_ws_send_data, "Task Send websocket", 8192, NULL, 1, NULL, 0);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
     xEventGroupSetBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_RUN);
 
 
-    BaseType_t result = xTaskCreatePinnedToCore(task_acc_read_fft, "Task Read ACC", 8192, NULL, 20, NULL, 1);
-    if (result != pdPASS) {
-        ESP_LOGI("task", "Failed to create task%d", result);
-    }
+    create_task_result = xTaskCreatePinnedToCore(task_acc_read_fft, "Task Read ACC", 8192, NULL, 20, NULL, 1);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     print_heap_info();
 
 

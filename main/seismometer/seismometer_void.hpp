@@ -72,13 +72,11 @@ seismometer_void_result seismometer_void::read(){
         if(cnt == 0) start_time = now;
         
         std::array<float, 3> gal1;
-        std::array<float, 3> gal2;
 
         gal1[0] = hpf_x.add_sample(gal[0]);
         gal1[1] = hpf_y.add_sample(gal[1]);
         gal1[2] = hpf_z.add_sample(gal[2]);
 
-        int32_t intensity_max30 = -20;
 
         if(is_stabilized) {
 

@@ -19,7 +19,6 @@
     (strcasecmp(&filename[strlen(filename) - sizeof(ext) + 1], ext) == 0)
 
 
-static char *nTAG = "network_httpd";
 
 
 /* Set HTTP response content type according to file extension */
