@@ -50,7 +50,7 @@
     #define BOARD_EQIS1 1
 #endif
 
-static const std::string firmware_version = "v0.1.0";
+static const std::string firmware_version = "v0.1.1";
 
 static constexpr uint32_t LONG_BUF_SIZE = 8192; 
 
