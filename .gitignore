@@ -6,11 +6,13 @@
 
 # production
 /build
-/build/*
+/build*
 
 
 sdkconfig
 /sdkconfig?*
+!/sdkconfig_eqis1
+!/sdkconfig_cyd
 
 #components
 /managed_components

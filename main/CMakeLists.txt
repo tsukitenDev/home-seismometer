@@ -1,7 +1,7 @@
 idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp" 
                             "sensor/lsm6dso.cpp"
                             "seismometer/iir.cpp"
-                            "seismometer/shindo_iir_filter.cpp"
+                            #"seismometer/shindo_iir_filter.cpp"
                             "seismometer/shindo_fft_processor.cpp"
                             "network/storage.cpp"
                             "network/wlan.cpp"
@@ -19,7 +19,6 @@ idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp"
                        REQUIRES lwip
                        REQUIRES fatfs)
 
-                            #"log_display.cpp"
 # Create a FATFS image from the contents of the 'fatfs_image' directory
 # that fits the partition named 'storage'. FLASH_IN_PROJECT indicates that
 # the generated image should be flashed when the entire project is flashed to

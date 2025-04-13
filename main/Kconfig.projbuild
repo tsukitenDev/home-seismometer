@@ -1,16 +1,17 @@
 menu "Example Configuration"
 
-    config ESP_WIFI_SSID
-        string "WiFi SSID"
-        default "myssid"
+    choice SIES_BOARD_USD
+        prompt "Board selection"
+        default SEIS_BOARD_NONE
         help
-            SSID (network name) for the example to connect to.
-
-    config ESP_WIFI_PASSWORD
-        string "WiFi Password"
-        default "mypassword"
-        help
-            WiFi password (WPA or WPA2) for the example to use.
+            Select seismometer board to use.
+        config SEIS_BOARD_NONE
+            bool "None"
+        config SEIS_BOARD_EQIS1
+            bool "EQIS-1, LSM6DSO"
+        config SEIS_BOARD_355_1732S019
+            bool "ESP32-1732S019(CYD), ADXL355"
+    endchoice
 
     choice ESP_WIFI_SAE_MODE
         prompt "WPA3 SAE mode selection"

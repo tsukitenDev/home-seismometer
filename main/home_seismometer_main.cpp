@@ -35,7 +35,7 @@
 
 #include "network/network.hpp"
 
-#include "seismometer/seismometer.hpp"
+//#include "seismometer/seismometer.hpp"
 #include "seismometer/seismometer_void.hpp"
 #include "seismometer/shindo_fft_processor.hpp"
 
@@ -44,8 +44,11 @@
 
 
 // ボード設定
-#define BOARD_355_1732S019 0
-#define BOARD_EQIS1 1
+#if CONFIG_SEIS_BOARD_355_1732S019
+    #define BOARD_355_1732S019 1
+#elif CONFIG_SEIS_BOARD_EQIS1
+    #define BOARD_EQIS1 1
+#endif
 
 static const std::string firmware_version = "v0.1.0";
 
@@ -79,7 +82,7 @@ void task_ws_send_data(void * pvParameters){
     }
 }
 
-#if BOARD_355_1732S019 == 1
+#if BOARD_355_1732S019
     // ピン指定
 static constexpr gpio_num_t BUILTIN_LED  = GPIO_NUM_21;
 static constexpr gpio_num_t PIN_NUM_MISO = GPIO_NUM_4;
@@ -88,12 +91,10 @@ static constexpr gpio_num_t PIN_NUM_CLK  = GPIO_NUM_6;
 static constexpr gpio_num_t PIN_NUM_MOSI = GPIO_NUM_7;
 static constexpr gpio_num_t PIN_NUM_INT1 = GPIO_NUM_15;
 static constexpr gpio_num_t PIN_NUM_INT2 = GPIO_NUM_16;
-static constexpr gpio_num_t PIN_BUTTON1  = GPIO_NUM_43;
-static constexpr gpio_num_t PIN_BUTTON2  = GPIO_NUM_2;
 
 static constexpr gpio_num_t PIN_VOLUME  = GPIO_NUM_2;
 
-#elif BOARD_EQIS1 == 1
+#elif BOARD_EQIS1
 
     // ピン指定
     static constexpr gpio_num_t BUILTIN_LED  = GPIO_NUM_21;
@@ -109,18 +110,20 @@ static constexpr gpio_num_t PIN_VOLUME  = GPIO_NUM_2;
 #endif
 
 // LovyanGFX
-#if BOARD_355_1732S019 == 1
+#if BOARD_355_1732S019
 static LGFX_1732S019_ST7789 lcd;
 static int32_t shindo_threshold = 5;
+static std::string firmware_name = "home-seismometer";
 static std::string device_name = "CYD";
 static std::string sensor_name = "ADXL355";
 std::string mdns_hostname =  "adxl";
 std::string mdns_instancename =  "CYD ESP32 Webserver";
 static std::string monitor_url = "adxl.local/monitor";
 
-#elif BOARD_EQIS1 == 1
+#elif BOARD_EQIS1
 static LGFX_EQIS1_SSD1306 lcd;
 static int32_t shindo_threshold = 15;
+static std::string firmware_name = "home-seismometer";
 static std::string device_name = "EQIS-1";
 static std::string sensor_name = "LSM6DSO";
 std::string mdns_hostname =  "eqis-1";
@@ -135,11 +138,11 @@ static LGFX_Sprite canvas(&lcd);
 
 
 
-#if BOARD_355_1732S019 == 1
+#if BOARD_355_1732S019
 uint8_t brightness = 255;
 
 static QueueHandle_t gpio_evt_queue = NULL;
-
+/*
 static void IRAM_ATTR button_pushed(void* args)
 {  
     // 割り込み内では簡単な処理のみ
@@ -163,6 +166,7 @@ static void gpio_task(void* arg)
         }
     }
 }
+*/
 #endif
 
 void print_heap_info(){
@@ -170,13 +174,13 @@ void print_heap_info(){
     heap_caps_get_info(&info_psram, MALLOC_CAP_SPIRAM);
     heap_caps_get_info(&info_internal, MALLOC_CAP_INTERNAL);
 
-    ESP_LOGI("heap info", "INTERNAL %d / %d kB (%d %% used), MAX %d kB",
+    ESP_LOGI("heap", "INTERNAL %d / %d kB (%d %% used), MAX %d kB",
                             info_internal.total_allocated_bytes / 1024,
                             (info_internal.total_free_bytes + info_internal.total_allocated_bytes) / 1024,
                             100 * info_internal.total_allocated_bytes / (info_internal.total_free_bytes + info_internal.total_allocated_bytes),
                             info_internal.largest_free_block / 1024);
     
-    ESP_LOGI("heap info", "PSRAM %d / %d kB (%d %% used), MAX %d kB",
+    ESP_LOGI("heap", "PSRAM %d / %d kB (%d %% used), MAX %d kB",
                             info_psram.total_allocated_bytes / 1024,
                             (info_psram.total_free_bytes + info_psram.total_allocated_bytes) / 1024,
                             100 * info_psram.total_allocated_bytes / (info_psram.total_free_bytes + info_psram.total_allocated_bytes),
@@ -215,7 +219,7 @@ void task_improv(void * pvParameters){
     #endif
 
     ESP_LOGI("improv", "start");
-    ImprovSerial improv("home-seismometer", firmware_version, sensor_name, device_name, std::string("http://") + monitor_url, uart_port_num);
+    ImprovSerial improv(firmware_name, firmware_version, sensor_name, device_name, std::string("http://") + monitor_url, uart_port_num);
     while(1) {
         improv.loop();
         vTaskDelay(50 / portTICK_PERIOD_MS);
@@ -275,14 +279,14 @@ int32_t min_shindo = 100;
 int64_t last_cnt = 0;
 
 void task_acc_read_fft(void * pvParameters){
-    const char *TAG = "ACC";
+    const char *TAG = "acc";
 
     // 加速度センサー設定
-    #if BOARD_355_1732S019 == 1
+    #if BOARD_355_1732S019
     ADXL355 sensor;
     is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
-    #elif BOARD_EQIS1 == 1
+    #elif BOARD_EQIS1
     LSM6DSO sensor;
     is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
@@ -516,13 +520,14 @@ void task_display(void * pvParameters){
 
 extern "C" void app_main(void)
 {
+    ESP_LOGI("app", "%s for %s %s", firmware_name.c_str(), device_name.c_str(), firmware_version.c_str());
     print_heap_info();
 
     // LGFX初期設定
     lcd.init();
-    #if BOARD_355_1732S019 == 1
+    #if BOARD_355_1732S019
     lcd.setRotation(1);
-    #elif BOARD_EQIS1 == 1
+    #elif BOARD_EQIS1
     lcd.setRotation(2);
     #endif
 
@@ -531,7 +536,8 @@ extern "C" void app_main(void)
 
 
 
-    #if BOARD_355_1732S019 == 1
+    #if BOARD_355_1732S019
+    /*
     // 輝度調整　割り込み設定
     gpio_evt_queue = xQueueCreate(10, 8);
     create_task_result = xTaskCreate(gpio_task, "gpio task", 2048, NULL, 0, NULL);
@@ -541,6 +547,7 @@ extern "C" void app_main(void)
     gpio_set_intr_type(PIN_VOLUME, GPIO_INTR_NEGEDGE);
     gpio_install_isr_service(0);
     gpio_isr_handler_add(PIN_VOLUME, button_pushed, (void *)PIN_VOLUME);
+    */
     #endif
 
     // 加速度センサ用 SPIバス設定
