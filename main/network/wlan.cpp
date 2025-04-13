@@ -76,7 +76,8 @@ static const char *TAG = "wifi station";
 
 
 
-
+// actual power: tx_power * 4 dBm
+static int8_t tx_power = 48; // 12 dBm
 
 
 
@@ -212,6 +213,8 @@ void wifi_init_sta(void)
     // Wi-Fi スタート
     // 前回の接続情報がNVSに保持されていれば再接続を試みる
     ESP_ERROR_CHECK( esp_wifi_start() );
+    ESP_LOGI(TAG, "set tx power to %d dBm", tx_power / 4);
+    ESP_ERROR_CHECK( esp_wifi_set_max_tx_power(tx_power) );
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 }
 

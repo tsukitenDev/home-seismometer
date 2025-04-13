@@ -47,6 +47,8 @@
 #define BOARD_355_1732S019 0
 #define BOARD_EQIS1 1
 
+static const std::string firmware_version = "v0.1.0";
+
 static constexpr uint32_t LONG_BUF_SIZE = 8192; 
 
 
@@ -58,6 +60,10 @@ ringBuffer<std::tuple<int64_t, float>> shindo_history(LONG_BUF_SIZE);
 
 QueueHandle_t que_bufCount;
 
+static constexpr uint64_t ws_send_period = 20;
+
+static constexpr uint32_t fft_calc_period = 100;
+
 bool is_start_shindo = false;
 
 void task_ws_send_data(void * pvParameters){
@@ -65,10 +71,10 @@ void task_ws_send_data(void * pvParameters){
     while(true){
         xQueueReceive(que_bufCount, &cnt, portMAX_DELAY);
         // websocket送信
-        ws_send_data("acc_hpf", hpf_acc_buffer.buffer_, cnt, 100);
-        ws_send_data("acc_raw", raw_acc_buffer.buffer_, cnt, 100);
+        ws_send_data("acc_hpf", hpf_acc_buffer.buffer_, cnt, ws_send_period);
+        ws_send_data("acc_raw", raw_acc_buffer.buffer_, cnt, ws_send_period);
         if(is_start_shindo){
-            ws_send_data("shindo", shindo_history.buffer_, cnt, 100);
+            ws_send_data("shindo", shindo_history.buffer_, cnt, ws_send_period);
         }
     }
 }
@@ -105,6 +111,7 @@ static constexpr gpio_num_t PIN_VOLUME  = GPIO_NUM_2;
 // LovyanGFX
 #if BOARD_355_1732S019 == 1
 static LGFX_1732S019_ST7789 lcd;
+static int32_t shindo_threshold = 5;
 static std::string device_name = "CYD";
 static std::string sensor_name = "ADXL355";
 std::string mdns_hostname =  "adxl";
@@ -113,6 +120,7 @@ static std::string monitor_url = "adxl.local/monitor";
 
 #elif BOARD_EQIS1 == 1
 static LGFX_EQIS1_SSD1306 lcd;
+static int32_t shindo_threshold = 15;
 static std::string device_name = "EQIS-1";
 static std::string sensor_name = "LSM6DSO";
 std::string mdns_hostname =  "eqis-1";
@@ -207,7 +215,7 @@ void task_improv(void * pvParameters){
     #endif
 
     ESP_LOGI("improv", "start");
-    ImprovSerial improv("home-seismometer", "v0.1", sensor_name, device_name, std::string("http://") + monitor_url, uart_port_num);
+    ImprovSerial improv("home-seismometer", firmware_version, sensor_name, device_name, std::string("http://") + monitor_url, uart_port_num);
     while(1) {
         improv.loop();
         vTaskDelay(50 / portTICK_PERIOD_MS);
@@ -321,28 +329,32 @@ void task_acc_read_fft(void * pvParameters){
 
         
         if(is_start_shindo){
-            if(cnt % 100 == 0){
+            if(cnt % fft_calc_period == 0){
                 //int64_t diff = esp_timer_get_time() - last_read // 10,000us→10ms
                 ESP_LOGI(TAG, "shindo: %.1f", (double)intensity_int10x / 10);
+            }
+            if(cnt % ws_send_period == 0){
                 // websocket 送信
                 xQueueSend(que_bufCount, &cnt, 0);
             }
         }
         else {
-            if(cnt % 100 == 0) {
+            if(cnt % fft_calc_period == 0) {
                 ESP_LOGI(TAG, "%lld, X %6.1fgal, Y %6.1fgal  Z %6.1fgal",
                                 cnt,
                                 res.gal_hpf[0],
                                 res.gal_hpf[1],
                                 res.gal_hpf[2]);
                 
+                
+            }
+            if(cnt % ws_send_period == 0) {
                 // websocket 送信
                 xQueueSend(que_bufCount, &cnt, 0);
-                
             }
         }
         if(res.is_stabilized){
-            if(cnt % 100 == 0){
+            if(cnt % fft_calc_period == 0){
                 xQueueSend(que_process_shindo, &cnt, 0);
             }
         }
@@ -397,6 +409,19 @@ void task_display(void * pvParameters){
         // 最大震度を表示する
         if(display_intensity < intensity_int10x) display_intensity = intensity_int10x;
 
+        if(display_mode == 0) {
+            if(is_shindo_stabilized && cnt > 120 * 100) display_mode = 2;
+        }else if(display_mode == 1){
+            if(intensity_int10x < shindo_threshold) {
+                display_intensity = 0;
+                display_mode = 2;
+            }
+        }else{ // display_mode == 2
+            if(intensity_int10x >= shindo_threshold) {
+                display_mode = 1;
+            }
+        }
+
         // check
         // display_mode = 1;
         // display_intensity = ((cnt / 100) * 5 ) % 80;
@@ -443,13 +468,17 @@ void task_display(void * pvParameters){
             if(is_shindo_stabilized) canvas.printf("shindo %.1f", shindo);    
 
             canvas.pushSprite(0, 0);
-            if(is_shindo_stabilized && cnt > 120 * 100) display_mode = 2;
+
         }else if(display_mode == 1) {
             canvas.setFont(&fonts::Font0);
             canvas.setTextSize(1);
             canvas.fillScreen(TFT_BLACK);
             canvas.setCursor(0,0);
-            canvas.printf("%s\n", monitor_url.c_str());
+            if(wifi_current_state == WIFI_STATE::CONNECTED){
+                canvas.printf("%s\n", monitor_url.c_str());
+            }else{
+                canvas.printf("WiFi : %s\n", wifi_status.c_str());                
+            } 
             canvas.setCursor(0, canvas.height() - canvas.fontHeight() * 2 - 6);
             canvas.printf(" Seismic\n Intensity");
             // 過去の震度を表示しているときは*マークを表示
@@ -462,17 +491,11 @@ void task_display(void * pvParameters){
             canvas.setTextSize(2);
             canvas.setCursor(canvas.getCursorX() + 2, canvas.getCursorY());
             canvas.printf("%c", shindo_text[1]);
-            
             // フリーズ確認
             if((cnt / 100) % 2 == 1) canvas.drawPixel(canvas.width() - 1, canvas.height() - 1, TFT_WHITE);
             
             canvas.pushSprite(0, 0);
-            if(intensity_int10x < 15) {
-                // 最大震度はリセット
-                display_intensity = 0;
-                display_mode = 2;
-            }
-            
+
         }else if(display_mode == 2) {
             canvas.setFont(&fonts::Font0);
             canvas.setTextSize(1);
@@ -480,8 +503,9 @@ void task_display(void * pvParameters){
             canvas.setCursor(canvas.width() - canvas.textWidth("-") - 2, canvas.height() - canvas.fontHeight() - 2);
             // フリーズ確認
             canvas.printf("%c", spinner[(cnt / 100) % 4]);
+
             canvas.pushSprite(0, 0);
-            if(intensity_int10x > 15) display_mode = 1;
+
         }
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
@@ -551,7 +575,7 @@ extern "C" void app_main(void)
     s_shindo_fft_event_group = xEventGroupCreate();
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    create_task_result = xTaskCreatePinnedToCore(task_process_shindo_fft, "process shindo", 4096, NULL, 1, NULL, 1);
+    create_task_result = xTaskCreatePinnedToCore(task_process_shindo_fft, "process shindo", 4096, NULL, 5, NULL, 1);
     if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
     
     xEventGroupWaitBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_READY, pdFALSE, pdFALSE, portMAX_DELAY);

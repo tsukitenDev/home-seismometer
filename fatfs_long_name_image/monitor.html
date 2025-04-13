@@ -50,7 +50,7 @@
         <h2 class="font-sans text-xl font-bold text-gray-800">震度</h2>
         <p class="text-8xl text-gray-800" id="value-shindo"></p>
       </div>
-<!-- CSVファイル表示セクション -->
+<!-- CSVファイル表示セクション 
 <div class="flex flex-col relative w-full p-4 mb-4 md:mr-4 bg-white rounded-lg shadow-xl">
   <h2 class="font-sans text-xl font-bold text-gray-800">保存済み震度データ</h2>
   <div class="flex flex-row mb-4">
@@ -74,8 +74,8 @@
         </tr>
       </thead>
       <tbody>
-        <!-- CSVデータがここに表示されます -->
       </tbody>
+    -->
     </table>
   </div>
   <div id="csv-chart-container" class="mt-4 h-52">
@@ -202,10 +202,6 @@ var chart_raw = new Chart(ctx, {
           frameRate: 60
         },
       },
-        y: { 
-          suggestedMin: -10,
-          suggestedMax: 10
-        },
       
     },
   },
@@ -433,11 +429,11 @@ function fetchAndDisplayCSV(filename) {
       }
       
       // チャートを描画
-      displayCSVChart(timeData, chartData);
+      //displayCSVChart(timeData, chartData);
     })
     .catch(error => console.error('Error fetching CSV file:', error));
 }
-
+/*
 // CSVデータをチャートに表示
 function displayCSVChart(timeData, intensityData) {
   // 既存のチャートを破棄
@@ -508,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchAndDisplayCSV(e.target.value);
   });
 });
-
+*/
 
     </script>
   </body>
