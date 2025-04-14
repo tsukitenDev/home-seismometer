@@ -414,7 +414,10 @@ void task_display(void * pvParameters){
         if(display_intensity < intensity_int10x) display_intensity = intensity_int10x;
 
         if(display_mode == 0) {
-            if(is_shindo_stabilized && cnt > 120 * 100) display_mode = 2;
+            if(is_shindo_stabilized && cnt > 120 * 100) {
+                display_intensity = 0;
+                display_mode = 2;
+            }
         }else if(display_mode == 1){
             if(intensity_int10x < shindo_threshold) {
                 display_intensity = 0;
