@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,7 +29,7 @@
       <div class="text-center p-4">
       </div>
       <div class="flex flex-col relative w-full p-4 mb-4 md:mr-4 bg-white rounded-lg shadow-xl">
-        <h2 class="font-sans text-xl font-bold text-gray-800">加速度(raw)</h2>
+        <h2 class="font-sans text-xl font-bold text-gray-800">加速度 (raw)</h2>
         <div class="flex-auto"><div class="h-52">
         <canvas id="Chart-acc-raw"></canvas>
       </div></div>
@@ -99,6 +99,8 @@ var chartColors = {
 	grey: 'rgb(201, 203, 207)'
 };
 
+// グラフの左端を揃えるため
+Chart.defaults.font.family = 'monospace';
 
 // 加速度グラフ
 var ctx = document.getElementById("Chart-acc").getContext("2d");
@@ -148,7 +150,12 @@ var chart = new Chart(ctx, {
       },
         y: { 
           suggestedMin: -10,
-          suggestedMax: 10
+          suggestedMax: 10,
+          ticks: {
+            callback: function(value) {
+              return value.toString().padStart(5, ' ');
+            },
+          }
         },
       
     },
@@ -202,6 +209,13 @@ var chart_raw = new Chart(ctx, {
           frameRate: 60
         },
       },
+      y: {
+        ticks: {
+          callback: function(value) {
+            return value.toString().padStart(5, ' ');
+          },
+        }
+      }
       
     },
   },
@@ -250,7 +264,12 @@ var chart_shindo = new Chart(ctx, {
       },
         y: { 
           suggestedMin: -0.5,
-          suggestedMax: 5
+          suggestedMax: 5,
+          ticks: {
+            callback: function(value) {
+              return value.toString().padStart(5, ' ');
+            },
+          }
         },
       
     },
@@ -268,10 +287,8 @@ var esp_time_offset = 0;
 function ws_onMessage(e){
   let now = Date.now();
 	data = JSON.parse(e.data);
-  console.log("data received");
   // 加速度グラフ描画
 	if("acc_raw" in data){
-    console.log("acc_raw");
 	  for(let i=0; i<data["acc_raw"].length; i++){
         let d = data["acc_raw"][i];
         // x, y, z それぞれ処理
@@ -287,7 +304,6 @@ function ws_onMessage(e){
     chart_raw.update("quiet");
   }
 	if("acc_hpf" in data){
-    console.log("acc_hpf");
     rcv_cnt += 1;
     if(esp_time_offset == 0 && rcv_cnt >= 2){
       let esp_time_from_wake_us = data["acc_hpf"][data["acc_hpf"].length-1][0];
@@ -310,9 +326,7 @@ function ws_onMessage(e){
 
   // 震度グラフ描画
   if("shindo" in data){
-    console.log("shindo");
     let arr = []
-    //console.log(data["shindo"]);
 	  for(let i=0; i<data["shindo"].length; i++){
         let d = data["shindo"][i];
         let x_time = now - 10*(data["shindo"].length - i - 1);
@@ -322,7 +336,6 @@ function ws_onMessage(e){
         });
         arr.push([d[0], 1.0 * d[1] / 10]);
 	  }
-    //console.log(arr);
     chart_shindo.update("quiet");
 
     // 震度表示更新
@@ -337,7 +350,7 @@ function onUnload_ws(){
 function ws_init(){
   connection = new WebSocket("ws://" + location.hostname + "/ws");
   console.log("websocket connected");
-  connection.onmessage = function(e) { console.log("data received"); ws_onMessage(e); };
+  //connection.onmessage = function(e) { console.log("data received"); ws_onMessage(e); };
   window.addEventListener("unload", onUnload_ws, false);
 }
 
