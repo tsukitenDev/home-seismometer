@@ -350,7 +350,7 @@ function onUnload_ws(){
 function ws_init(){
   connection = new WebSocket("ws://" + location.hostname + "/ws");
   console.log("websocket connected");
-  //connection.onmessage = function(e) { console.log("data received"); ws_onMessage(e); };
+  connection.onmessage = function(e) { ws_onMessage(e); };
   window.addEventListener("unload", onUnload_ws, false);
 }
 
