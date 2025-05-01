@@ -63,7 +63,7 @@ void read_csv(){
         std::vector<std::string> strvec = split(line, ',');
         if(strvec.size() != 3) ESP_LOGW("read_csv", "error");
         if(i < 3){
-            ESP_LOGW("example", "%s %s %s", strvec[0].c_str(), strvec[1].c_str(), strvec[2].c_str());
+            ESP_LOGW("read_csv", "%s %s %s", strvec[0].c_str(), strvec[1].c_str(), strvec[2].c_str());
         }
         hpf_acc_buffer[i] = {i, {stof(strvec[0]), stof(strvec[1]), stof(strvec[2])}};
         i++;
@@ -143,87 +143,87 @@ void ifft(float* arr, int32_t len){
 
 void shindo_processor::init() {
     esp_err_t ret;
-    fft2r_table_buff = static_cast<float*>(heap_caps_aligned_alloc(16, FFT_LEN * sizeof(float), MALLOC_CAP_INTERNAL));
+    fft2r_table_buff = static_cast<float*>(heap_caps_aligned_alloc(16, LEN_FFT * sizeof(float), MALLOC_CAP_INTERNAL));
     if(fft2r_table_buff == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
-    ESP_ERROR_CHECK(dsps_fft2r_init_fc32(fft2r_table_buff, FFT_LEN));
+    ESP_ERROR_CHECK(dsps_fft2r_init_fc32(fft2r_table_buff, LEN_FFT));
 
-    fft_arr = static_cast<float*>(heap_caps_aligned_alloc(16, 2 * FFT_LEN * sizeof(float), MALLOC_CAP_INTERNAL));
+    fft_arr = static_cast<float*>(heap_caps_aligned_alloc(16, 2 * LEN_FFT * sizeof(float), MALLOC_CAP_INTERNAL));
     if(fft_arr == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
     
 
-    pro_sig_X = static_cast<float*>(heap_caps_malloc(FFT_LEN * sizeof(float), MALLOC_CAP_SPIRAM));
-    pro_sig_Y = static_cast<float*>(heap_caps_malloc(FFT_LEN * sizeof(float), MALLOC_CAP_SPIRAM));
-    pro_sig_Z = static_cast<float*>(heap_caps_malloc(FFT_LEN * sizeof(float), MALLOC_CAP_SPIRAM));
-    pro_sig_synth.assign(FFT_LEN, 0);
+    pro_sig_X = static_cast<float*>(heap_caps_malloc(LEN_FFT * sizeof(float), MALLOC_CAP_SPIRAM));
+    pro_sig_Y = static_cast<float*>(heap_caps_malloc(LEN_FFT * sizeof(float), MALLOC_CAP_SPIRAM));
+    pro_sig_Z = static_cast<float*>(heap_caps_malloc(LEN_FFT * sizeof(float), MALLOC_CAP_SPIRAM));
+    pro_sig_synth.assign(LEN_FFT, 0);
 
     if(pro_sig_X == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
     if(pro_sig_Y == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
     if(pro_sig_Z == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
     //if(pro_sig_synth == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
     
-    win_hann = static_cast<float*>(heap_caps_aligned_alloc(16, win_len * sizeof(float), MALLOC_CAP_SPIRAM));
+    win_hann = static_cast<float*>(heap_caps_aligned_alloc(16, LEN_WIN_HANN * sizeof(float), MALLOC_CAP_SPIRAM));
     if(win_hann == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
 
-    init_win_hann(win_hann, 200);
+    init_win_hann(win_hann, LEN_WIN_HANN);
 
-    jma_spectrum_filter = static_cast<float*>(heap_caps_aligned_alloc(16, FFT_LEN * sizeof(float), MALLOC_CAP_SPIRAM));
+    jma_spectrum_filter = static_cast<float*>(heap_caps_aligned_alloc(16, LEN_FFT * sizeof(float), MALLOC_CAP_SPIRAM));
     if(jma_spectrum_filter == NULL) ESP_LOGW(TAG, "Failed to allocate memory");
 
-    init_jma_filter(jma_spectrum_filter, FFT_LEN);
+    init_jma_filter(jma_spectrum_filter, LEN_FFT);
 
     ESP_LOGI(TAG, "init done");
 }
 
-int32_t shindo_processor::calc(int64_t cnt){
+int32_t shindo_processor::calc(int64_t cnt, bool apply_wind){
 
-    for(int i=0; i<FFT_LEN; i++) pro_sig_synth[i] = 0;
+    for(int i=0; i<LEN_FFT; i++) pro_sig_synth[i] = 0;
 
     // X
-    for(int i=0; i<FFT_LEN; i++){
-        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(FFT_LEN-1)+i])[0];
+    for(int i=0; i<LEN_FFT; i++){
+        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(LEN_FFT-1)+i])[0];
         fft_arr[2*i+1] = 0;
     }
     
-    process_one();
+    process_one(apply_wind);
     
-    for(int i=0; i<FFT_LEN; i++){
+    for(int i=0; i<LEN_FFT; i++){
         pro_sig_X[i] = fft_arr[2*i];
     }
     // 2乗してpro_sig_synthに直接加算
-    for(int i=0; i<FFT_LEN; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
+    for(int i=0; i<LEN_FFT; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
 
 
     // Y
-    for(int i=0; i<FFT_LEN; i++){
-        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(FFT_LEN-1)+i])[1];
+    for(int i=0; i<LEN_FFT; i++){
+        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(LEN_FFT-1)+i])[1];
         fft_arr[2*i+1] = 0;
     }
 
-    process_one();
+    process_one(apply_wind);
     
-    for(int i=0; i<FFT_LEN; i++){
+    for(int i=0; i<LEN_FFT; i++){
         pro_sig_Y[i] = fft_arr[2*i];
     }
     // 2乗してpro_sig_synthに直接加算
-    for(int i=0; i<FFT_LEN; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
+    for(int i=0; i<LEN_FFT; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
 
     // Z
-    for(int i=0; i<FFT_LEN; i++){
-        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(FFT_LEN-1)+i])[2];
+    for(int i=0; i<LEN_FFT; i++){
+        fft_arr[2*i] = std::get<1>(hpf_arr[cnt-(LEN_FFT-1)+i])[2];
         fft_arr[2*i+1] = 0;
     }
 
-    process_one();
+    process_one(apply_wind);
     
-    for(int i=0; i<FFT_LEN; i++){
+    for(int i=0; i<LEN_FFT; i++){
         pro_sig_Z[i] = fft_arr[2*i];
     }
     // 2乗してpro_sig_synthに直接加算
-    for(int i=0; i<FFT_LEN; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
+    for(int i=0; i<LEN_FFT; i++){ pro_sig_synth[i] += fft_arr[2*i] * fft_arr[2*i]; }
     
     
     
-    for(int i=0; i<FFT_LEN; i++){ pro_sig_synth[i] = sqrtf(pro_sig_synth[i]);}
+    for(int i=0; i<LEN_FFT; i++){ pro_sig_synth[i] = sqrtf(pro_sig_synth[i]);}
 
 
     // 震度計算
@@ -239,42 +239,36 @@ int32_t shindo_processor::calc(int64_t cnt){
 
 
 
-void shindo_processor::process_one(){
+void shindo_processor::process_one(bool apply_win){
     int64_t start_a = esp_timer_get_time();
     // 端に窓適用
-    for(int i=0; i<win_len/2; i++){
-        fft_arr[i*2] = fft_arr[i*2] * win_hann[i];
-        fft_arr[(FFT_LEN-1-i)*2] = fft_arr[(FFT_LEN-1-i)*2] * win_hann[win_len-1-i];
+    if(apply_win) {
+        for(int i=0; i<LEN_WIN_HANN/2; i++){
+            fft_arr[i*2] = fft_arr[i*2] * win_hann[i];
+            fft_arr[(LEN_FFT-1-i) * 2] = fft_arr[(LEN_FFT-1-i) * 2] * win_hann[LEN_WIN_HANN - 1 - i];
+        }
     }
 
     int64_t start_b = esp_timer_get_time();
-    fft(fft_arr, FFT_LEN);
+    fft(fft_arr, LEN_FFT);
     //ESP_LOGI("FFT", "%6.1f   %6.1f", fft_arr[0], fft_arr[1]);
     //ESP_LOGI("FFT", "%6.1f   %6.1f", fft_arr[2], fft_arr[3]);
 
-    dsps_mul_f32(&fft_arr[0], &jma_spectrum_filter[0], &fft_arr[0], FFT_LEN, 2, 1, 2);
-    dsps_mul_f32(&fft_arr[1], &jma_spectrum_filter[0], &fft_arr[1], FFT_LEN, 2, 1, 2);
+    dsps_mul_f32(&fft_arr[0], &jma_spectrum_filter[0], &fft_arr[0], LEN_FFT, 2, 1, 2);
+    dsps_mul_f32(&fft_arr[1], &jma_spectrum_filter[0], &fft_arr[1], LEN_FFT, 2, 1, 2);
 
-    ifft(fft_arr, FFT_LEN);
+    ifft(fft_arr, LEN_FFT);
     int64_t start_d = esp_timer_get_time();
     //ESP_LOGI("FFT", "total %lldus, fft %lldus", start_d - start_a, start_d - start_b);
     return;
 }
 
 
-EventGroupHandle_t s_seis_test_event_group;
 
 void task_calc_shindo_fft_test(void * pvParameters){
 
     const int32_t FFT_CALC_LEN = 4096;
     shindo_processor processor(FFT_CALC_LEN, hpf_acc_buffer);
-
-    ESP_LOGI("calc-shindo-fft", "ready");
-    xEventGroupSetBits(s_seis_test_event_group, BIT_TASK_CALC_SHINDO_FFT_TEST_READY);
-    xEventGroupWaitBits(s_seis_test_event_group, BIT_TASK_CALC_SHINDO_FFT_TEST_RUN, pdFALSE, pdFALSE, portMAX_DELAY);
-    xEventGroupSetBits(s_seis_test_event_group, BIT_TASK_CALC_SHINDO_FFT_TEST_RUNNING);
-
-    ESP_LOGI("calc-shindo-fft", "start");
 
     read_csv();
 
@@ -291,7 +285,7 @@ void task_calc_shindo_fft_test(void * pvParameters){
 
     while(true){
         int64_t st_a = esp_timer_get_time();
-        float res = processor.calc(FFT_CALC_LEN-1);
+        float res = processor.calc(FFT_CALC_LEN-1, false);
         ESP_LOGI("shindo", "%.2f", res);
         int64_t st_b = esp_timer_get_time();
         ESP_LOGW("shindo", "complete 3 FFT in %'lldus", st_b - st_a);
@@ -316,7 +310,7 @@ void task_calc_shindo_fft_test(void * pvParameters){
         }
         
         for(int64_t i=0; i<FFT_CALC_LEN; i++){
-            ofs << i << ","  // UNIX時刻z
+            ofs << i << ","
                 << std::get<1>(hpf_acc_buffer[FFT_CALC_LEN-1-(FFT_CALC_LEN-1)+i])[0] << ","
                 << processor.pro_sig_X[i] << ","  // x
                 << std::get<1>(hpf_acc_buffer[FFT_CALC_LEN-1-(FFT_CALC_LEN-1)+i])[1] << ","
