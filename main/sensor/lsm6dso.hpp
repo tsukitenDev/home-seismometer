@@ -8,6 +8,7 @@
 #include "sensor_base.hpp"
 
 //namespace LSM6DSO_REG{
+    constexpr uint8_t PIN_CTRL           = 0x02;
     constexpr uint8_t FIFO_CTRL1         = 0x07;
     constexpr uint8_t FIFO_CTRL2         = 0x08;
     constexpr uint8_t FIFO_CTRL3         = 0x09;
@@ -22,6 +23,7 @@
     constexpr uint8_t CTRL3_C            = 0x12;
     constexpr uint8_t CTRL7_G            = 0x16;
     constexpr uint8_t CTRL8_XL           = 0x17;
+    constexpr uint8_t OUT_TEMP_L         = 0x20;
     constexpr uint8_t OUTX_L_G           = 0x22;
     constexpr uint8_t OUTX_L_A           = 0x28;
     constexpr uint8_t FIFO_STATUS1       = 0x3A;
