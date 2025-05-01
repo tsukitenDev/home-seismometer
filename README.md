@@ -26,6 +26,10 @@ ESP32用のWeb UIを備えた地震計ファームウェア
 - LSM6DSO
 - ADXL355
 
+> [!warning]
+> XIAO ESP32S3 と LSM6DSO の組み合わせにおいて、センサーのノイズが通常より大きくなる現象を確認しています。  
+> 震度1以下の地震の検知が難しいことを留意の上ご使用ください。
+
 
 ## インストール
 https://tsukitendev.github.io/home-seismometer/
