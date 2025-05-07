@@ -32,7 +32,6 @@
 #include <LGFX_1732S019_ST7789.hpp>
 #include "driver/spi_master.h"
 
-
 #include "network/network.hpp"
 
 //#include "seismometer/seismometer.hpp"
@@ -42,13 +41,8 @@
 
 #include "network/wlan.hpp"
 
+#include "board_def.hpp"
 
-// ボード設定
-#if CONFIG_SEIS_BOARD_355_1732S019
-    #define BOARD_355_1732S019 1
-#elif CONFIG_SEIS_BOARD_EQIS1
-    #define BOARD_EQIS1 1
-#endif
 
 static const std::string firmware_version = "v0.1.2";
 
@@ -82,36 +76,12 @@ void task_ws_send_data(void * pvParameters){
     }
 }
 
-#if BOARD_355_1732S019
-    // ピン指定
-static constexpr gpio_num_t BUILTIN_LED  = GPIO_NUM_21;
-static constexpr gpio_num_t PIN_NUM_MISO = GPIO_NUM_4;
-static constexpr gpio_num_t PIN_NUM_CS   = GPIO_NUM_5;
-static constexpr gpio_num_t PIN_NUM_CLK  = GPIO_NUM_6;
-static constexpr gpio_num_t PIN_NUM_MOSI = GPIO_NUM_7;
-static constexpr gpio_num_t PIN_NUM_INT1 = GPIO_NUM_15;
-static constexpr gpio_num_t PIN_NUM_INT2 = GPIO_NUM_16;
 
-static constexpr gpio_num_t PIN_VOLUME  = GPIO_NUM_2;
-
-#elif BOARD_EQIS1
-
-    // ピン指定
-    static constexpr gpio_num_t BUILTIN_LED  = GPIO_NUM_21;
-    static constexpr gpio_num_t PIN_NUM_MISO = GPIO_NUM_8;
-    static constexpr gpio_num_t PIN_NUM_MOSI = GPIO_NUM_9;
-    static constexpr gpio_num_t PIN_NUM_CLK  = GPIO_NUM_7;
-    static constexpr gpio_num_t PIN_NUM_CS   = GPIO_NUM_4;
-    static constexpr gpio_num_t PIN_NUM_INT1 = GPIO_NUM_3;
-    static constexpr gpio_num_t PIN_NUM_INT2 = GPIO_NUM_44;
-    static constexpr gpio_num_t PIN_BUTTON1  = GPIO_NUM_43;
-    static constexpr gpio_num_t PIN_BUTTON2  = GPIO_NUM_2;
-
-#endif
 
 // LovyanGFX
 #if BOARD_355_1732S019
 static LGFX_1732S019_ST7789 lcd;
+const static uint8_t LCD_ROTATION = 1;
 static int32_t shindo_threshold = 5;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "CYD";
@@ -122,6 +92,7 @@ static std::string monitor_url = "adxl.local/monitor";
 
 #elif BOARD_EQIS1
 static LGFX_EQIS1_SSD1306 lcd;
+const static uint8_t LCD_ROTATION = 2;
 static int32_t shindo_threshold = 15;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "EQIS-1";
@@ -129,7 +100,6 @@ static std::string sensor_name = "LSM6DSO";
 std::string mdns_hostname =  "eqis-1";
 std::string mdns_instancename =  "EQIS-1 ESP32 Webserver";
 static std::string monitor_url = "eqis-1.local/monitor";
-
 
 #endif
 
@@ -282,11 +252,11 @@ void task_acc_read_fft(void * pvParameters){
     const char *TAG = "acc";
 
     // 加速度センサー設定
-    #if BOARD_355_1732S019
+    #if SENSOR_ADXL355
     ADXL355 sensor;
     is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
-    #elif BOARD_EQIS1
+    #elif SENSOR_LSM6DSO
     LSM6DSO sensor;
     is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
     
@@ -528,11 +498,7 @@ extern "C" void app_main(void)
 
     // LGFX初期設定
     lcd.init();
-    #if BOARD_355_1732S019
-    lcd.setRotation(1);
-    #elif BOARD_EQIS1
-    lcd.setRotation(2);
-    #endif
+    lcd.setRotation(LCD_ROTATION);
 
 
     BaseType_t create_task_result;

@@ -1,6 +1,6 @@
 menu "Example Configuration"
 
-    choice SIES_BOARD_USD
+    choice SEIS_BOARD_USE
         prompt "Board selection"
         default SEIS_BOARD_NONE
         help
