@@ -7,7 +7,7 @@
 
 #include "sensor_base.hpp"
 
-//namespace LSM6DSO_REG{
+//namespace ADXL355_REG{
     constexpr uint8_t DEVID_AD           = 0x00;
     constexpr uint8_t DEVID_MST          = 0x01;
     constexpr uint8_t XDATA3             = 0x08;

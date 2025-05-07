@@ -47,9 +47,7 @@ void ADXL355::IO_Write(const uint8_t RegisterAddr, uint8_t data) const {
                 .tx_data = {data}
             };
             ESP_LOGI("ADXL355_IO", "write: 0x%x, %x", RegisterAddr, data);
-            //esp_err_t ret = 
             spi_device_polling_transmit(this->spi, &t);
-            //assert(ret == ESP_OK);
 }
 void ADXL355::IO_Read(const uint8_t RegisterAddr, uint8_t& data) const {
             uint8_t cmd = (RegisterAddr << 1) | 1; // 読取はLSBを立てる
@@ -59,9 +57,7 @@ void ADXL355::IO_Read(const uint8_t RegisterAddr, uint8_t& data) const {
                 .rxlength = 8    
             };              // データ部は8bits
             //ESP_LOGI("LSM6DSO", "send: %x", cmd);
-            //esp_err_t err = 
             spi_device_polling_transmit(this->spi, &t);
-            //assert(err == ESP_OK);
             data = t.rx_data[0];
 }
 
@@ -75,9 +71,7 @@ void ADXL355::IO_Read_LH(const uint8_t RegisterAddr, int16_t* arr, const uint8_t
                 .rx_buffer = arr
             };
             //ESP_LOGI("LSM6DSO", "send: %x", cmd);
-            //esp_err_t err = 
             spi_device_polling_transmit(this->spi, &t);
-            //assert(err == ESP_OK);
 }
 
 void ADXL355::IO_Read_FIFO(const uint8_t RegisterAddr, uint8_t* arr, const uint8_t len) const {
@@ -88,9 +82,7 @@ void ADXL355::IO_Read_FIFO(const uint8_t RegisterAddr, uint8_t* arr, const uint8
        .rx_buffer = arr
     };
     //ESP_LOGI("LSM6DSO", "send: %x", cmd);
-    //esp_err_t err = 
     spi_device_polling_transmit(this->spi, &t);
-    //assert(err == ESP_OK);
 }
 
 std::array<int32_t, 3> ADXL355::Read_XYZ_RAW(void) const {

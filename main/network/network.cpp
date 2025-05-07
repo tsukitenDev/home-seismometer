@@ -129,48 +129,8 @@ esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t* ws_pkt) {
 
 
 
-// Claude生成
-
-esp_err_t get_csv_list_handler(httpd_req_t *req) {
-    const char *TAG = "CSV_LIST";
-    ESP_LOGI(TAG, "Getting CSV file list");
-    
-    // SPIFFSのデータディレクトリをオープン
-    DIR *dir = opendir("/spiflash/data");
-    if (!dir) {
-        ESP_LOGE(TAG, "Failed to open directory");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open directory");
-        return ESP_FAIL;
-    }
-    
-    // JSONレスポンスを構築
-    std::string json = "{\"files\":[";
-    struct dirent *entry;
-    bool first = true;
-    
-    while ((entry = readdir(dir)) != NULL) {
-        // CSVファイルのみをリストに追加
-        if (strstr(entry->d_name, ".csv") != NULL) {
-            if (!first) {
-                json += ",";
-            }
-            json += "\"" + std::string(entry->d_name) + "\"";
-            first = false;
-        }
-    }
-    
-    json += "]}";
-    closedir(dir);
-    
-    // JSONレスポンスを送信
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, json.c_str(), json.length());
-    
-    return ESP_OK;
-}
 
 
-// Claude生成
 esp_err_t get_csv_file_handler(httpd_req_t *req) {
     const char *TAG = "CSV_FILE";
     
@@ -206,13 +166,6 @@ esp_err_t get_csv_file_handler(httpd_req_t *req) {
 }
 
 
-// URIハンドラ登録
-httpd_uri_t csv_list = {
-    .uri       = "/csv/list",
-    .method    = HTTP_GET,
-    .handler   = get_csv_list_handler,
-    .user_ctx  = NULL
-};
 
 httpd_uri_t csv_file = {
     .uri       = "/csv/*",
@@ -248,8 +201,7 @@ httpd_handle_t start_webserver(void)
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &ws);
         httpd_register_uri_handler(server, &monitor);
-        // claude: start_webserver関数内に追加
-        httpd_register_uri_handler(server, &csv_list);
+
         httpd_register_uri_handler(server, &csv_file);
         return server;
     }

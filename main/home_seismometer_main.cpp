@@ -107,38 +107,6 @@ static std::string monitor_url = "eqis-1.local/monitor";
 static LGFX_Sprite canvas(&lcd);
 
 
-
-#if BOARD_355_1732S019
-uint8_t brightness = 255;
-
-static QueueHandle_t gpio_evt_queue = NULL;
-/*
-static void IRAM_ATTR button_pushed(void* args)
-{  
-    // 割り込み内では簡単な処理のみ
-    uint32_t gpio_num = PIN_VOLUME;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-}
-
-static void gpio_task(void* arg)
-{
-    uint32_t io_num;
-    for (;;) {
-        if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            if(io_num == PIN_VOLUME){
-                if(brightness==255) brightness = 0;
-                else brightness += 51;
-                lcd.setBrightness(brightness);
-                ESP_LOGI("lcd", "brightness %d", brightness);
-            }
-            vTaskDelay(80/portTICK_PERIOD_MS); // チャタリング防止
-            xQueueReset(gpio_evt_queue);
-        }
-    }
-}
-*/
-#endif
-
 void print_heap_info(){
     multi_heap_info_t info_psram, info_internal;
     heap_caps_get_info(&info_psram, MALLOC_CAP_SPIRAM);
@@ -229,11 +197,11 @@ void task_process_shindo_fft(void * pvParameters){
         BaseType_t result = xQueueReceive(que_process_shindo, &cnt, portMAX_DELAY);
         if(result != pdPASS) continue;
 
-        int64_t st_a = esp_timer_get_time();
+        //int64_t st_a = esp_timer_get_time();
 
         int32_t res = processor.calc(cnt);
         
-        int64_t st_b = esp_timer_get_time();
+        //int64_t st_b = esp_timer_get_time();
         //ESP_LOGW("shindo", "complete 3 FFT in %'lldus", st_b - st_a);
         
         xQueueSend(que_shindo_res, &res, 0);
@@ -267,7 +235,9 @@ void task_acc_read_fft(void * pvParameters){
     // 初期化
     seismometer_void processer(sensor);
 
-    int64_t start_time = esp_timer_get_time();
+    //int64_t start_time = esp_timer_get_time();
+    //int64_t last_read = esp_timer_get_time();
+
     TickType_t xLastTime;
     xLastTime = xTaskGetTickCount();
 
@@ -275,7 +245,6 @@ void task_acc_read_fft(void * pvParameters){
 
     int32_t intensity_int10x = -20;
 
-    int64_t last_read = esp_timer_get_time();
 
     
 
@@ -332,7 +301,7 @@ void task_acc_read_fft(void * pvParameters){
                 xQueueSend(que_process_shindo, &cnt, 0);
             }
         }
-        last_read = now;
+        // last_read = now;
         last_cnt = cnt;
         xTaskDelayUntil(&xLastTime, 10 / portTICK_PERIOD_MS);
     }
@@ -502,22 +471,6 @@ extern "C" void app_main(void)
 
 
     BaseType_t create_task_result;
-
-
-
-    #if BOARD_355_1732S019
-    /*
-    // 輝度調整　割り込み設定
-    gpio_evt_queue = xQueueCreate(10, 8);
-    create_task_result = xTaskCreate(gpio_task, "gpio task", 2048, NULL, 0, NULL);
-
-    gpio_set_direction(PIN_VOLUME, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(PIN_VOLUME, GPIO_PULLUP_ONLY);
-    gpio_set_intr_type(PIN_VOLUME, GPIO_INTR_NEGEDGE);
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(PIN_VOLUME, button_pushed, (void *)PIN_VOLUME);
-    */
-    #endif
 
     // 加速度センサ用 SPIバス設定
     esp_err_t ret;

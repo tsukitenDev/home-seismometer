@@ -25,8 +25,6 @@ class ImprovSerial {
         bool loop(bool timeout = false);
         improv::State get_state();
         improv::Command get_command();
-        //std::string get_ssid();
-        //std::string get_password();
       
     protected:
         bool parse_improv_serial_byte_(uint8_t byte);
