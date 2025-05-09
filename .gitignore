@@ -23,5 +23,8 @@ sdkconfig
 /memo*
 /test*
 
+.cursor
+.cline
+
 .DS_Store
 .vscode
