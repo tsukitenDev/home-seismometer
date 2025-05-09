@@ -20,7 +20,6 @@
 #include "nvs_flash.h"
 #include "esp_wifi.h"
 #include "driver/gpio.h"
-#include "driver/uart.h"
 
 
 #include "sensor/lsm6dso.hpp"
@@ -40,6 +39,8 @@
 
 
 #include "network/wlan.hpp"
+
+#include "task_improv.hpp"
 
 #include "board_def.hpp"
 
@@ -126,43 +127,6 @@ void print_heap_info(){
 }
 
 
-#include "driver/usb_serial_jtag.h"
-#include "network/improv_wifi_handler.hpp"
-
-void task_improv(void * pvParameters){
-    uart_port_t uart_port_num = UART_NUM_0;
-    #if CONFIG_ESP_CONSOLE_UART_DEFAULT
-    QueueHandle_t queue_uart;
-    uart_config_t uart_config = {
-      .baud_rate = 115200,
-      .data_bits = UART_DATA_8_BITS,
-      .parity = UART_PARITY_DISABLE,
-      .stop_bits = UART_STOP_BITS_1,
-      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-      .source_clk = UART_SCLK_DEFAULT,
-    };
-    const int buf_size = (1024*2);
-    uart_driver_install(uart_port_num, buf_size, buf_size, 20, &queue_uart, 0);
-    uart_param_config(uart_port_num, &uart_config);
-    uart_set_pin(uart_port_num, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    uart_flush(uart_port_num);
-    #elif CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
-    usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
-        .tx_buffer_size = 1024,
-        .rx_buffer_size = 1024
-    };
-    ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_jtag_config));
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    #endif
-
-    ESP_LOGI("improv", "start");
-    ImprovSerial improv(firmware_name, firmware_version, sensor_name, device_name, std::string("http://") + monitor_url, uart_port_num);
-    while(1) {
-        improv.loop();
-        vTaskDelay(50 / portTICK_PERIOD_MS);
-    }
-}
 
 
 
@@ -514,7 +478,7 @@ extern "C" void app_main(void)
     httpd_init();
 
 
-
+    improv_set_info(firmware_name, firmware_version,sensor_name, device_name, monitor_url);
     create_task_result = xTaskCreatePinnedToCore(task_improv, "Task improv serial", 8192, NULL, 5, NULL, 0);
     if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
