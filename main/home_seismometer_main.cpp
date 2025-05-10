@@ -21,9 +21,8 @@
 #include "esp_wifi.h"
 #include "driver/gpio.h"
 
+#include "data_structure.hpp"
 
-#include "sensor/lsm6dso.hpp"
-#include "sensor/adxl355.hpp"
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
@@ -33,15 +32,12 @@
 
 #include "network/network.hpp"
 
-//#include "seismometer/seismometer.hpp"
-#include "seismometer/seismometer_void.hpp"
-#include "seismometer/shindo_fft_processor.hpp"
-
 
 #include "network/wlan.hpp"
 
 #include "task_improv.hpp"
 #include "task_ws_send.hpp"
+#include "task_seis_fft.hpp"
 
 #include "board_def.hpp"
 
@@ -61,9 +57,6 @@ QueueHandle_t que_bufCount;
 
 uint32_t ws_send_period = 20;
 
-static constexpr uint32_t fft_calc_period = 100;
-
-bool is_start_shindo = false;
 
 
 
@@ -94,6 +87,18 @@ static std::string monitor_url = "eqis-1.local/monitor";
 #endif
 
 
+EventGroupHandle_t s_shindo_fft_event_group;
+
+QueueHandle_t que_process_shindo;
+QueueHandle_t que_shindo_res;
+
+extern SENSOR_STATE acc_sensor_state;
+extern SEISMOMETER_STATE seis_state;
+bool is_start_shindo = false;
+
+extern int64_t last_cnt;
+
+
 static LGFX_Sprite canvas(&lcd);
 
 
@@ -120,145 +125,6 @@ void print_heap_info(){
 
 
 
-
-EventGroupHandle_t s_shindo_fft_event_group;
-
-#define BIT_TASK_PROCESS_SHINDO_READY BIT0
-#define BIT_TASK_PROCESS_SHINDO_RUN BIT1
-#define BIT_TASK_PROCESS_SHINDO_RUNNING BIT2
-
-
-QueueHandle_t que_process_shindo;
-QueueHandle_t que_shindo_res;
-
-
-void task_process_shindo_fft(void * pvParameters){
-
-    const int32_t FFT_CALC_LEN = 4096;
-    shindo_processor processor(FFT_CALC_LEN, hpf_acc_buffer);
-
-    ESP_LOGI("calc-shindo-fft", "ready");
-    xEventGroupSetBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_READY);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    xEventGroupWaitBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_RUN, pdFALSE, pdFALSE, portMAX_DELAY);
-    xEventGroupSetBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_RUNNING);
-
-    ESP_LOGI("calc-shindo-fft", "start");
-    int64_t cnt;
-
-    while(true){
-        BaseType_t result = xQueueReceive(que_process_shindo, &cnt, portMAX_DELAY);
-        if(result != pdPASS) continue;
-
-        //int64_t st_a = esp_timer_get_time();
-
-        int32_t res = processor.calc(cnt);
-        
-        //int64_t st_b = esp_timer_get_time();
-        //ESP_LOGW("shindo", "complete 3 FFT in %'lldus", st_b - st_a);
-        
-        xQueueSend(que_shindo_res, &res, 0);
-    }
-}
-
-
-bool is_sensor_connected = false;
-bool is_sensor_connect_failed = false;
-
-bool is_shindo_stabilized = false;
-int32_t min_shindo = 100;
-int64_t last_cnt = 0;
-
-void task_acc_read_fft(void * pvParameters){
-    const char *TAG = "acc";
-
-    // 加速度センサー設定
-    #if SENSOR_ADXL355
-    ADXL355 sensor;
-    is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
-    
-    #elif SENSOR_LSM6DSO
-    LSM6DSO sensor;
-    is_sensor_connected = sensor.init(SPI2_HOST, PIN_NUM_CS);
-    
-    #endif
-
-    is_sensor_connect_failed = !is_sensor_connected;
-
-    // 初期化
-    seismometer_void processer(sensor);
-
-    //int64_t start_time = esp_timer_get_time();
-    //int64_t last_read = esp_timer_get_time();
-
-    TickType_t xLastTime;
-    xLastTime = xTaskGetTickCount();
-
-    int64_t cnt;
-
-    int32_t intensity_int10x = -20;
-
-
-    
-
-    ESP_LOGI(TAG, "START");
-
-    while(1){
-        int64_t now = esp_timer_get_time();
-
-        auto res = processer.read();
-        cnt = res.cnt;
-        
-        // 履歴保存
-        raw_acc_buffer[cnt] = {now, res.gal_raw};
-        hpf_acc_buffer[cnt] = {now, res.gal_hpf}; 
-
-        int32_t fft_res_intensity;
-        BaseType_t shindo_fft_res = xQueueReceive(que_shindo_res, &fft_res_intensity, 0);
-        if(shindo_fft_res == pdPASS){
-            is_start_shindo = true;
-            intensity_int10x = fft_res_intensity;
-            if(intensity_int10x < min_shindo) min_shindo = intensity_int10x;
-            if(min_shindo < 20) is_shindo_stabilized = true;
-        }
-        if(is_start_shindo) shindo_history[cnt] = {now, intensity_int10x};  
-
-        
-        if(is_start_shindo){
-            if(cnt % fft_calc_period == 0){
-                //int64_t diff = esp_timer_get_time() - last_read // 10,000us→10ms
-                ESP_LOGI(TAG, "shindo: %.1f", (double)intensity_int10x / 10);
-            }
-            if(cnt % ws_send_period == 0){
-                // websocket 送信
-                xQueueSend(que_bufCount, &cnt, 0);
-            }
-        }
-        else {
-            if(cnt % fft_calc_period == 0) {
-                ESP_LOGI(TAG, "%lld, X %6.1fgal, Y %6.1fgal  Z %6.1fgal",
-                                cnt,
-                                res.gal_hpf[0],
-                                res.gal_hpf[1],
-                                res.gal_hpf[2]);
-                
-                
-            }
-            if(cnt % ws_send_period == 0) {
-                // websocket 送信
-                xQueueSend(que_bufCount, &cnt, 0);
-            }
-        }
-        if(res.is_stabilized){
-            if(cnt % fft_calc_period == 0){
-                xQueueSend(que_process_shindo, &cnt, 0);
-            }
-        }
-        // last_read = now;
-        last_cnt = cnt;
-        xTaskDelayUntil(&xLastTime, 10 / portTICK_PERIOD_MS);
-    }
-}
 
 
 void task_display(void * pvParameters){
@@ -290,12 +156,17 @@ void task_display(void * pvParameters){
         if(wifi_current_state == WIFI_STATE::CONNECT_FAILED) wifi_status = "Connect Failed";
         if(wifi_current_state == WIFI_STATE::NOT_CONNECTED)  wifi_status = "Not Connected";
 
-        if(is_sensor_connected) sensor_status = "Connected";
-        else if(is_sensor_connect_failed) sensor_status = "Connect Failed";
-        else sensor_status = "";
+        if(acc_sensor_state == SENSOR_STATE::CONNECTED) sensor_status = "Connected";
+        if(acc_sensor_state == SENSOR_STATE::CONNECT_FAILED) sensor_status = "Connect Failed";
 
-        if(!is_sensor_connected) seis_status = "";
-        else if(is_shindo_stabilized) seis_status = "Stabilized";
+        if(acc_sensor_state != SENSOR_STATE::CONNECTED ||
+           seis_state == SEISMOMETER_STATE::NOT_STARTED){
+            seis_status = "";
+        }
+        else if(seis_state == SEISMOMETER_STATE::SHINDO_STABILIZING ||
+                seis_state == SEISMOMETER_STATE::SHINDO_STABILIZED){
+            seis_status = "Stabilized";
+        }
         else seis_status = "Stabilizing";
 
 
@@ -306,7 +177,7 @@ void task_display(void * pvParameters){
         if(display_intensity < intensity_int10x) display_intensity = intensity_int10x;
 
         if(display_mode == 0) {
-            if(is_shindo_stabilized && cnt > 120 * 100) {
+            if(seis_state == SEISMOMETER_STATE::SHINDO_STABILIZED && cnt > 120 * 100) {
                 display_intensity = 0;
                 display_mode = 2;
             }
@@ -364,7 +235,10 @@ void task_display(void * pvParameters){
             canvas.printf("\n");
             canvas.printf("X      Y      Z cm/s2\n");
             canvas.printf("%6.1f %6.1f %6.1f\n", gal_x, gal_y, gal_z);
-            if(is_shindo_stabilized) canvas.printf("shindo %.1f", shindo);    
+            if(seis_state == SEISMOMETER_STATE::SHINDO_STABILIZING ||
+               seis_state == SEISMOMETER_STATE::SHINDO_STABILIZED){
+                canvas.printf("shindo %.1f", shindo);
+            }
 
             canvas.pushSprite(0, 0);
 

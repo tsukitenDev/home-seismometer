@@ -10,6 +10,7 @@ idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp"
                             "network/improv_wifi_handler.cpp"
                             "task_improv.cpp" 
                             "task_ws_send.cpp"
+                            "task_seis_fft.cpp"
                            
                            
                             
