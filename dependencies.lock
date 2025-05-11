@@ -23,9 +23,20 @@ dependencies:
     source:
       type: idf
     version: 5.4.1
+  johboh/nlohmann-json:
+    component_hash: 2a97e10124d755da820b0381e36a9a6504574328f262964ccea3f8b2f228fc66
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.12.0
 direct_dependencies:
 - espressif/esp-dsp
 - espressif/mdns
-manifest_hash: a119bc6aa8d0b1f82c979f2875d2e85dc9657564b65a2a796ed0be4dc07b463c
+- johboh/nlohmann-json
+manifest_hash: 2b217c425cc4399142d08f0481808461bff33aa6f9006aa763d0841b7c94b9f7
 target: esp32s3
 version: 2.0.0

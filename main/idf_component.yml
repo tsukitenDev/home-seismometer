@@ -1,3 +1,4 @@
 dependencies:
-  espressif/mdns: "*"
-  espressif/esp-dsp: "*"
+  espressif/mdns: '*'
+  espressif/esp-dsp: '*'
+  johboh/nlohmann-json: ^3.12.0
