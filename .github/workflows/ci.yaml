@@ -1,0 +1,45 @@
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    name: ESP-IDF Build 
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        board: [eqis1, cyd]
+    steps:
+    - name: Define output name
+      run: |
+        short_hash=${GITHUB_SHA::7}
+        echo "bin_name=home-seismometer-for-${{ matrix.board }}-${{ github.ref_name }}-${short_hash}.bin" >> $GITHUB_ENV
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: ls
+      run: ls -a
+    - name: esp-idf build
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v5.4.1
+        target: esp32s3
+        command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig_${{ matrix.board }}" build
+    - name: esp-idf merge_bin
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v5.4.1
+        target: esp32s3
+        command: idf.py build && cd build && esptool.py --chip esp32s3 merge_bin -o ../${{ env.bin_name }} @flash_args
+    - name: ls
+      run: ls -a
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.bin_name }} 
+        path: ${{ env.bin_name }} 
+
