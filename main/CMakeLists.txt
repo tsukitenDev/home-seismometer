@@ -31,7 +31,7 @@ idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp"
 # Otherwise it will support wear levelling and thus enable read-write mounting of the image in the device.
 
 
-if(true)
+if(CONFIG_WEB_DEPLOY_SPIFLASH)
     set(image ../fatfs_long_name_image)
     fatfs_create_spiflash_image(storage ${image} FLASH_IN_PROJECT PRESERVE_TIME)
 endif()

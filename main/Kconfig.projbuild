@@ -1,5 +1,20 @@
 menu "Example Configuration"
 
+    choice WEB_DEPLOY
+        prompt "Web files location"
+        default WEB_DEPLOY_SPIFLASH
+        help
+            Choose where to load web files from.
+        config WEB_DEPLOY_SEMIHOST
+            bool "Semihosting"
+            help
+                Load web files from PC via semihosting.
+        config WEB_DEPLOY_SPIFLASH
+            bool "SPI Flash"
+            help
+                Load web files from SPI flash.
+    endchoice
+
     choice SEIS_BOARD_USE
         prompt "Board selection"
         default SEIS_BOARD_NONE
@@ -24,7 +39,7 @@ menu "Example Configuration"
             bool "H2E"
         config ESP_WPA3_SAE_PWE_BOTH
             bool "BOTH"
-    endchoice
+        endchoice
 
     config ESP_WIFI_PW_ID
         string "PASSWORD IDENTIFIER"
