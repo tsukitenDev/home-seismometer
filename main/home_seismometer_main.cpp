@@ -43,7 +43,7 @@
 #include "board_def.hpp"
 
 
-static const std::string firmware_version = "v0.1.2";
+static const std::string firmware_version = "v0.1.3";
 
 static constexpr uint32_t LONG_BUF_SIZE = 8192; 
 
