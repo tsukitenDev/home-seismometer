@@ -8,8 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.0.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0"></script>
   </head>
-  <body>
-      <header class="text-gray-600 body-font bg-white">
+  <body class="bg-gray-100">
+      <header class="text-gray-600 body-font bg-white shadow-md">
         <div class="container mx-auto flex flex-wrap p-5 flex-col md:flex-row items-center">
           <a class="flex title-font font-medium items-center text-gray-900 mb-4 md:mb-0">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="w-10 h-10 text-white p-2 bg-indigo-500 rounded-full" viewBox="0 0 24 24">
@@ -18,14 +18,14 @@
             <span class="ml-3 text-xl">Home Seismometer</span>
           </a>
           <nav class="md:ml-auto flex flex-wrap items-center text-base justify-center">
-            <!--<a class="mr-5 hover:text-gray-900">First Link</a>-->
+            <a href="/monitor" class="mr-5 text-indigo-600 font-semibold border-b-2 border-indigo-600">モニター</a>
+            <a href="/setting" class="mr-5 hover:text-gray-900">設定</a>
           </nav>
         </div>
       </header>
-      <main class="p-4 bg-gray-200  justify-center max-w-8xl">
-      <div class="max-w-6xl flex flex-col md:flex-row md:flex-wrap">
+      <main class="p-4">
+      <div class="max-w-6xl flex flex-col md:flex-row md:flex-wrap mx-auto">
 
-      <!--<h1>加速度モニタ</h1>-->
       <div class="text-center p-4">
       </div>
       <div class="flex flex-col relative w-full p-4 mb-4 md:mr-4 bg-white rounded-lg shadow-xl">
@@ -50,32 +50,6 @@
         <h2 class="font-sans text-xl font-bold text-gray-800">震度</h2>
         <p class="text-8xl text-gray-800" id="value-shindo"></p>
       </div>
-<!-- CSVファイル表示セクション 
-<div class="flex flex-col relative w-full p-4 mb-4 md:mr-4 bg-white rounded-lg shadow-xl">
-  <h2 class="font-sans text-xl font-bold text-gray-800">保存済み震度データ</h2>
-  <div class="flex flex-row mb-4">
-    <select id="csv-file-select" class="p-2 border rounded-md mr-2 flex-grow">
-      <option value="">ファイルを選択してください</option>
-    </select>
-    <button id="refresh-csv-list" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-      更新
-    </button>
-  </div>
-  <div id="csv-table-container" class="overflow-x-auto">
-    <table id="csv-table" class="min-w-full bg-white border">
-      <thead>
-        <tr>
-          <th class="py-2 px-4 border-b border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            タイムスタンプ
-          </th>
-          <th class="py-2 px-4 border-b border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            震度
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-      </tbody>
-    -->
     </table>
   </div>
   <div id="csv-chart-container" class="mt-4 h-52">
@@ -363,161 +337,6 @@ function chart_pause(){
 
 window.addEventListener("load", ws_init, false);
 
-// CSVファイル一覧を取得する関数
-function fetchCSVFileList() {
-  fetch('/csv/list')
-    .then(response => response.json())
-    .then(data => {
-      const select = document.getElementById('csv-file-select');
-      // 既存のオプションをクリア（最初のオプションは残す）
-      while (select.options.length > 1) {
-        select.remove(1);
-      }
-      
-      // ファイル一覧を追加
-      data.files.forEach(file => {
-        const option = document.createElement('option');
-        option.value = file;
-        option.textContent = file;
-        select.appendChild(option);
-      });
-    })
-    .catch(error => console.error('Error fetching CSV file list:', error));
-}
-
-// CSVファイルを取得して表示する関数
-function fetchAndDisplayCSV(filename) {
-  if (!filename) return;
-  
-  fetch(`/csv/${filename}`)
-    .then(response => response.text())
-    .then(csvText => {
-      // CSVをパース
-      const rows = csvText.split('\n');
-      const headers = rows[0].split(',');
-      
-      // テーブルに表示
-      const tbody = document.querySelector('#csv-table tbody');
-      tbody.innerHTML = '';
-      
-      // データ行を処理
-      const chartData = {x:[], y:[], z:[]};
-      const timeData = [];
-      
-      let now = Date.now();
-      for (let i = 1; i < rows.length; i++) {
-        if (!rows[i].trim()) continue; // 空行をスキップ
-        
-        const values = rows[i].split(',');
-        const row = document.createElement('tr');
-        
-        // タイムスタンプと震度値を取得（CSVの形式に合わせて調整）
-        const timestamp = parseInt(values[0]);
-        const x = parseFloat(values[1]);
-        const y = parseFloat(values[2]);
-        const z = parseFloat(values[3]);
-        
-        // データをチャート用に保存
-        if (!isNaN(timestamp)) {
-          timeData.push(now + 10 * i);
-          chartData["x"].push(x);
-          chartData["y"].push(y);
-          chartData["z"].push(z);
-        }
-        
-        // テーブル行を作成
-        /*
-        const timestampCell = document.createElement('td');
-        timestampCell.className = 'py-2 px-4 border-b border-gray-200';
-        timestampCell.textContent = timestamp;
-        row.appendChild(timestampCell);
-        
-        const intensityCell = document.createElement('td');
-        intensityCell.className = 'py-2 px-4 border-b border-gray-200';
-        intensityCell.textContent = intensity;
-        row.appendChild(intensityCell);
-        
-        tbody.appendChild(row);
-        */
-      }
-      
-      // チャートを描画
-      //displayCSVChart(timeData, chartData);
-    })
-    .catch(error => console.error('Error fetching CSV file:', error));
-}
-/*
-// CSVデータをチャートに表示
-function displayCSVChart(timeData, intensityData) {
-  // 既存のチャートを破棄
-  if (window.csvChart) {
-    window.csvChart.destroy();
-  }
-  
-  const ctx = document.getElementById('Chart-csv').getContext('2d');
-  
-  // 背景用グラデーション
-  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, 'rgba(54, 162, 235, 1)');
-  gradient.addColorStop(0.95, 'rgba(54, 162, 235, 0)');
-  
-  window.csvChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: timeData,
-    datasets: [
-      {
-        label: "X",
-        data: intensityData["x"],
-        borderColor: chartColors.blue,
-      },
-      {
-        label: "Y",
-        data: intensityData["y"],
-        borderColor: chartColors.red, 
-      },
-      {
-        label: "Z",
-        data: intensityData["z"],
-         borderColor: chartColors.green, 
-      },
-    ],
-    },
-  options: {
-    animation: false,
-    responsive: true,
-    maintainAspectRatio: false,
-    datasets: {
-      line : {
-        radius: 0,  // 点なし
-        cubicInterpolationMode: 'monotone',
-        borderWidth: 1.5,
-      }
-    },
-    scales: {
-      x: {
-        type: 'time',
-        time: {unit: 'second'}
-      }
-    }
-  }
-});
-}
-
-// イベントリスナーの設定
-document.addEventListener('DOMContentLoaded', function() {
-  // 初期ロード時にCSVファイル一覧を取得
-  fetchCSVFileList();
-  
-  // 更新ボタンのイベントリスナー
-  document.getElementById('refresh-csv-list').addEventListener('click', fetchCSVFileList);
-  
-  // ファイル選択のイベントリスナー
-  document.getElementById('csv-file-select').addEventListener('change', function(e) {
-    fetchAndDisplayCSV(e.target.value);
-  });
-});
-*/
 
     </script>
   </body>

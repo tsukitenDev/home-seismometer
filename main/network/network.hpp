@@ -13,3 +13,5 @@ void ws_send_data(std::string tag, std::vector<std::tuple<int64_t, std::array<fl
 
 template<typename T>
 void ws_send_data(std::string tag, std::vector<std::tuple<int64_t, T>>& data, uint64_t it, uint64_t n);
+
+std::string get_ip_address_str();

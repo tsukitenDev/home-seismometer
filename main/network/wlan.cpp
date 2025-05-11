@@ -319,6 +319,34 @@ std::string authmode_toString(int authmode)
     }
 }
 
+std::string authmode_toString_short(int authmode)
+{
+    switch (authmode) {
+    case WIFI_AUTH_OPEN:
+        return("OPEN");
+    case WIFI_AUTH_OWE:
+        return("OWE");
+    case WIFI_AUTH_WEP:
+        return("WEP");
+    case WIFI_AUTH_WPA_PSK:
+        return("WPA PSK");
+    case WIFI_AUTH_WPA2_PSK:
+        return("WPA2 PSK");
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        return("WPA WPA2 PSK");
+    case WIFI_AUTH_ENTERPRISE:
+        return("ENTERPRISE");
+    case WIFI_AUTH_WPA3_PSK:
+        return("WPA3 PSK");
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+        return("WPA2 WPA3 PSK");
+    case WIFI_AUTH_WPA3_ENT_192:
+        return("WPA3 ENT 192");
+    default:
+        return("UNKNOWN");
+    }
+}
+
 
 std::string cipher_toString(int cipher)
 {
@@ -477,4 +505,36 @@ WIFI_STATE wifi_get_state(){
     if(is_connected)      res = WIFI_STATE::CONNECTED;
     if(is_connect_failed) res = WIFI_STATE::CONNECT_FAILED;
     return res;
+}
+
+ap_record_t wifi_get_current_ap() {
+    ap_record_t current_ap;
+    current_ap.ssid = "";
+    current_ap.rssi = 0;
+    current_ap.authmode = "";
+
+    if (wifi_is_connected()) {
+        wifi_ap_record_t ap_record;
+        esp_err_t res = esp_wifi_sta_get_ap_info(&ap_record);
+        if (res == ESP_OK) {
+            current_ap.ssid = std::string(reinterpret_cast<char*>(ap_record.ssid));
+            current_ap.rssi = ap_record.rssi;
+            current_ap.authmode = authmode_toString_short(ap_record.authmode);
+        }
+    }
+    return current_ap;
+}
+
+std::string wifi_get_ip_address_str() {
+    esp_netif_ip_info_t ip_info_sta;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif != NULL) {
+        esp_err_t ip_err = esp_netif_get_ip_info(netif, &ip_info_sta);
+        if (ip_err == ESP_OK) {
+            char ip_str[IP4ADDR_STRLEN_MAX];
+            esp_ip4addr_ntoa(&ip_info_sta.ip, ip_str, IP4ADDR_STRLEN_MAX);
+            return std::string(ip_str);
+        }
+    }
+    return "";
 }

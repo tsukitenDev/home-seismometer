@@ -29,6 +29,7 @@
 
 #include "storage.hpp"
 
+#include "rest_api.hpp"
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
 
@@ -58,6 +59,20 @@ httpd_uri_t monitor = {
     	.handler   = get_monitor_handler,
         .user_ctx = NULL
 };
+
+
+esp_err_t get_setting_handler(httpd_req_t *req) {
+    httpd_resp_sendfile(req, "/spiflash/setting.html");
+    return ESP_OK;
+}
+
+httpd_uri_t setting = {
+    .uri       = "/setting",
+    .method    = HTTP_GET,
+    .handler   = get_setting_handler,
+    .user_ctx  = NULL
+};
+
 
 /*
 esp_err_t get_handler(httpd_req_t *req)
@@ -201,8 +216,11 @@ httpd_handle_t start_webserver(void)
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &ws);
         httpd_register_uri_handler(server, &monitor);
+        httpd_register_uri_handler(server, &setting);
+        register_rest_api_handlers(server);
 
         httpd_register_uri_handler(server, &csv_file);
+        
         return server;
     }
 

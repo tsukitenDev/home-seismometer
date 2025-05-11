@@ -37,5 +37,5 @@ enum WIFI_STATE : uint8_t {
 
 WIFI_STATE wifi_get_state();
 
-//ap_record_t wifi_get_current_ap();
-
+ap_record_t wifi_get_current_ap();
+std::string wifi_get_ip_address_str();
