@@ -30,10 +30,11 @@
 #include <LGFX_1732S019_ST7789.hpp>
 #include "driver/spi_master.h"
 
+#include "network/wlan.hpp"
 #include "network/network.hpp"
 
+#include "network/device_info.hpp"
 
-#include "network/wlan.hpp"
 
 #include "task_improv.hpp"
 #include "task_ws_send.hpp"
@@ -69,8 +70,8 @@ static int32_t shindo_threshold = 5;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "CYD";
 static std::string sensor_name = "ADXL355";
-std::string mdns_hostname =  "adxl";
-std::string mdns_instancename =  "CYD ESP32 Webserver";
+static std::string mdns_hostname =  "adxl";
+static std::string mdns_instancename =  "CYD ESP32 Webserver";
 static std::string monitor_url = "adxl.local/monitor";
 
 #elif BOARD_EQIS1
@@ -80,12 +81,21 @@ static int32_t shindo_threshold = 15;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "EQIS-1";
 static std::string sensor_name = "LSM6DSO";
-std::string mdns_hostname =  "eqis-1";
-std::string mdns_instancename =  "EQIS-1 ESP32 Webserver";
+static std::string mdns_hostname =  "eqis-1";
+static std::string mdns_instancename =  "EQIS-1 ESP32 Webserver";
 static std::string monitor_url = "eqis-1.local/monitor";
 
 #endif
 
+device_info_t device_info = {
+    .firmware_name = firmware_name,
+    .firmware_version = firmware_version,
+    .device_name = device_name,
+    .sensor_name = sensor_name,
+    .mdns_hostname =  mdns_hostname,
+    .mdns_instancename =  mdns_instancename,
+    .monitor_url = monitor_url,
+};
 
 EventGroupHandle_t s_shindo_fft_event_group;
 

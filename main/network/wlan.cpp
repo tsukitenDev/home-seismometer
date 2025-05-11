@@ -23,6 +23,7 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "device_info.hpp"
 
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
@@ -439,9 +440,7 @@ void sntp_sync_time(){
 
 
 
-extern std::string mdns_hostname;
-extern std::string mdns_instancename;
-
+extern device_info_t device_info;
 
 
 void start_mdns_service()
@@ -452,9 +451,9 @@ void start_mdns_service()
         return;
     }
 
-    mdns_hostname_set(mdns_hostname.c_str());
-    mdns_instance_name_set(mdns_instancename.c_str());
-    ESP_LOGI("mdns", "start mdns service %s",mdns_hostname.c_str());
+    mdns_hostname_set(device_info.mdns_hostname.c_str());
+    mdns_instance_name_set(device_info.mdns_instancename.c_str());
+    ESP_LOGI("mdns", "start mdns service %s", device_info.mdns_hostname.c_str());
 }
 
 void wifi_init(){
