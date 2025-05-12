@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>設定 - Home Seismometer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-gray-100">
     <header class="text-gray-600 body-font bg-white shadow-md">
@@ -23,89 +26,125 @@
     </header>
 
     <main class="p-4">
-        <div class="container mx-auto mt-8">
-            <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-xl">
-                <!-- Tabs -->
-                <div class="border-b border-gray-200">
-                    <nav class="-mb-px flex space-x-8 pl-4" aria-label="Tabs">
-                        <a href="#" id="tab-device-info" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-indigo-600 border-indigo-500" aria-current="page">
-                            デバイス情報
-                        </a>
-                        <!-- <a href="#" id="tab-settings" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                            設定
-                        </a> -->
-                    </nav>
-                </div>
-
-                <!-- Tab Content -->
-                <div id="content-device-info" class="p-8">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">デバイス情報</h1>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">デバイス名</span>
-                            <span id="device-name" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">ファームウェア</span>
-                            <span id="firmware-version" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">加速度センサー</span>
-                            <span id="sensor-name" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">アクセスポイント</span>
-                            <span id="ap-ssid" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">RSSI</span>
-                            <span id="ap-rssi" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">認証タイプ</span>
-                            <span id="ap-authmode" class="text-gray-900">読み込み中</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-md">
-                            <span class="font-semibold text-gray-700">IPアドレス</span>
-                            <span id="ip-address" class="text-gray-900">読み込み中</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- <div id="content-network-settings" class="hidden p-8">
-                    <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">設定</h1>
-                    </div> -->
-            </div>
-        </div>
+        <div id="settings-root" class="container mx-auto mt-8"></div>
     </main>
 
-    <script>
-        async function fetchDeviceInfo() {
-            try {
-                const response = await fetch('/api/device_info');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                document.getElementById('device-name').textContent = data.device_name;
-                document.getElementById('firmware-version').textContent = data.firmware_version;
-                document.getElementById('sensor-name').textContent = data.sensor_name;
-                document.getElementById('ap-ssid').textContent = data.ap_ssid;
-                document.getElementById('ap-rssi').textContent = data.ap_rssi;
-                document.getElementById('ap-authmode').textContent = data.ap_authmode;
-                document.getElementById('ip-address').textContent = data.ip_address;
+    <script type="text/babel">
+        const DeviceInfoItem = ({ label, value }) => (
+            <div className="flex justify-between items-center p-4 bg-gray-50 rounded-md">
+                <span className="font-semibold text-gray-700">{label}</span>
+                <span className="text-gray-900">{value}</span>
+            </div>
+        );
 
-            } catch (error) {
-                console.error('Error fetchDeviceInfo:', error);
-                document.getElementById('device-name').textContent = '取得失敗';
-                document.getElementById('firmware-version').textContent = '取得失敗';
-                document.getElementById('sensor-name').textContent = '取得失敗';
-                document.getElementById('ap-ssid').textContent = '取得失敗';
-                document.getElementById('ap-rssi').textContent = '取得失敗';
-                document.getElementById('ap-authmode').textContent = '取得失敗';
-                document.getElementById('ip-address').textContent = '取得失敗';
-            }
-        }
-        window.onload = fetchDeviceInfo;
+        const DeviceInfo = () => {
+            const [deviceInfo, setDeviceInfo] = React.useState({
+                device_name: '読み込み中',
+                firmware_version: '読み込み中',
+                sensor_name: '読み込み中',
+                ap_ssid: '読み込み中',
+                ap_rssi: '読み込み中',
+                ap_authmode: '読み込み中',
+                ip_address: '読み込み中',
+            });
+            const [error, setError] = React.useState(null);
+
+            React.useEffect(() => {
+                const fetchDeviceInfo = async () => {
+                    try {
+                        const response = await fetch('/api/device_info');
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.json();
+                        setDeviceInfo(data);
+                        setError(null);
+                    } catch (err) {
+                        console.error('Error fetchDeviceInfo:', err);
+                        setError('デバイス情報の取得に失敗しました。');
+                        setDeviceInfo({
+                            device_name: '取得失敗',
+                            firmware_version: '取得失敗',
+                            sensor_name: '取得失敗',
+                            ap_ssid: '取得失敗',
+                            ap_rssi: '取得失敗',
+                            ap_authmode: '取得失敗',
+                            ip_address: '取得失敗',
+                        });
+                    }
+                };
+                fetchDeviceInfo();
+            }, []);
+
+            return (
+                <div className="p-8">
+                    <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">デバイス情報</h1>
+                    {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+                    <div className="space-y-4">
+                        <DeviceInfoItem label="デバイス名" value={deviceInfo.device_name} />
+                        <DeviceInfoItem label="ファームウェア" value={deviceInfo.firmware_version} />
+                        <DeviceInfoItem label="加速度センサー" value={deviceInfo.sensor_name} />
+                        <DeviceInfoItem label="アクセスポイント" value={deviceInfo.ap_ssid} />
+                        <DeviceInfoItem label="RSSI" value={deviceInfo.ap_rssi} />
+                        <DeviceInfoItem label="認証タイプ" value={deviceInfo.ap_authmode} />
+                        <DeviceInfoItem label="IPアドレス" value={deviceInfo.ip_address} />
+                    </div>
+                </div>
+            );
+        };
+
+        const TabButton = ({ children, isActive, onClick }) => {
+            const activeClasses = "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-indigo-600 border-indigo-500";
+            const inactiveClasses = "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300";
+            return (
+                <a href="#" onClick={onClick} className={isActive ? activeClasses : inactiveClasses} aria-current={isActive ? "page" : undefined}>
+                    {children}
+                </a>
+            );
+        };
+
+        const Tabs = ({ activeTab, onTabClick }) => {
+            const TABS = [
+                { id: 'device-info', label: 'デバイス情報' },
+                // { id: 'webhook-settings', label: 'Webhook' },
+            ];
+
+            return (
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8 pl-4" aria-label="Tabs">
+                        {TABS.map(tab => (
+                            <TabButton
+                                key={tab.id}
+                                isActive={activeTab === tab.id}
+                                onClick={(e) => { e.preventDefault(); onTabClick(tab.id); }}
+                            >
+                                {tab.label}
+                            </TabButton>
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
+
+        const SettingsPage = () => {
+            const [activeTab, setActiveTab] = React.useState('device-info');
+
+            const handleTabClick = (tabId) => {
+                setActiveTab(tabId);
+            };
+
+            return (
+                <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl">
+                    <Tabs activeTab={activeTab} onTabClick={handleTabClick} />
+                    {activeTab === 'device-info' && <DeviceInfo />}
+                    {/* {activeTab === 'webhook-settings' && <div>Webhook設定のコンテンツ</div>} */}
+                </div>
+            );
+        };
+
+        const domContainer = document.querySelector('#settings-root');
+        const root = ReactDOM.createRoot(domContainer);
+        root.render(<SettingsPage />);
     </script>
 </body>
 </html>
