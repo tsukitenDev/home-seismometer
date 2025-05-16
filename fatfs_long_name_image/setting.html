@@ -93,6 +93,130 @@
             );
         };
 
+        const WebhookSettings = () => {
+            const [webhooks, setWebhooks] = React.useState([]);
+            // { webhookId: 'sending' | 'success' | 'error' | 'idle' }
+            const [sendingStatus, setSendingStatus] = React.useState({});
+            const [error, setError] = React.useState(null);
+
+            React.useEffect(() => {
+                const fetchWebhooks = async () => {
+                    try {
+                        setError(null);
+                        const response = await fetch('/api/webhook/list');
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                        }
+                        const data = await response.json();
+
+                        const formattedData = data.map(wh => {
+                            let displayUrl = wh.url;
+                            try {
+                                const url = new URL(wh.url);
+                                displayUrl = url.hostname;
+                            } catch (e) {
+                                console.error("Invalid URL:", wh.url, e);
+                                // Invalid URL, keep original or show error
+                            }
+                            return {
+                                id: wh.id,
+                                enabled: wh.enabled,
+                                shindoThreshold: wh.shindo_threshold,
+                                name: wh.name,
+                                description: `${displayUrl}`, // Use displayUrl here
+                                url: wh.url,
+                                payload_template: wh.payload_template
+                            };
+                        });
+                        setWebhooks(formattedData);
+                    } catch (err) {
+                        console.error('Error fetching webhooks:', err);
+                        setError(`Webhook設定の取得に失敗: ${err.message}`);
+                        setWebhooks([]);
+                    }
+                };
+                fetchWebhooks();
+            }, []);
+
+            const handleSendWebhook = async (webhook) => {
+                setSendingStatus(prev => ({ ...prev, [webhook.id]: 'sending' }));
+                console.log(`Requesting ESP32 to send webhook for ${webhook.name}`);
+                try {
+                    const response = await fetch(`/api/webhook/send?id=${webhook.id}`, {
+                        method: 'POST',
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ message: 'エラー' }));
+                        throw new Error(`ESP32 API error! status: ${response.status}, message: ${errorData.message}`);
+                    }
+
+                    const result = await response.json();
+                    console.log(`Webhook for ${webhook.name} sent via ESP32:`, result);
+                    setSendingStatus(prev => ({ ...prev, [webhook.id]: 'success' }));
+                } catch (error) {
+                    console.error(`Error requesting ESP32 to send webhook for ${webhook.name}:`, error);
+                    setSendingStatus(prev => ({ ...prev, [webhook.id]: 'error' }));
+                }
+            };
+
+            return (
+                <div className="p-8">
+                    <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">Webhook設定</h1>
+                    {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+                    {webhooks.length === 0 && !error && <p className="text-gray-500 text-center mb-4">利用可能なWebhook設定はありません。</p>}
+                    <div className="space-y-6">
+                        {webhooks.map((webhook) => (
+                            <div key={webhook.id} className="p-6 bg-gray-50 rounded-lg shadow">
+                                <p className="text-xs font-medium text-gray-500">Store {webhook.id}</p>
+                                <h2 className="text-xl font-semibold text-gray-700 mb-2">{webhook.name}</h2>
+                                <p className="text-sm text-gray-600 mb-4">{webhook.description}</p>
+                                {/* Toggle switch for enabled */}
+                                <div className="flex items-center mb-2">
+                                    <label htmlFor={`enabled-${webhook.id}`} className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input
+                                                type="checkbox"
+                                                id={`enabled-${webhook.id}`}
+                                                className="sr-only"
+                                                checked={webhook.enabled}
+                                                disabled
+                                            />
+                                            {/* track */}
+                                            <div className={`block w-10 h-6 rounded-full ${webhook.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                                            {/* thumb */}
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition ${webhook.enabled ? 'translate-x-full' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div className="flex items-center mb-4">
+                                    <span className="text-sm text-gray-700 mr-2">震度通知しきい値:</span>
+                                    <span className="text-gray-900">{(webhook.shindoThreshold / 10.0).toFixed(1)}</span>
+                                </div>
+                                <button
+                                    onClick={() => handleSendWebhook(webhook)}
+                                    disabled={sendingStatus[webhook.id] === 'sending'}
+                                    className={`w-full px-4 py-2 rounded-md text-white font-semibold transition-colors
+                                        ${sendingStatus[webhook.id] === 'sending' ? 'bg-gray-400 cursor-not-allowed' :
+                                        sendingStatus[webhook.id] === 'success' ? 'bg-green-500 hover:bg-green-600' :
+                                        sendingStatus[webhook.id] === 'error' ? 'bg-red-500 hover:bg-red-600' :
+                                        'bg-indigo-600 hover:bg-indigo-700'}`}
+                                >
+                                    {sendingStatus[webhook.id] === 'sending' ? '送信中...' :
+                                     sendingStatus[webhook.id] === 'success' ? '送信成功' :
+                                     sendingStatus[webhook.id] === 'error' ? '送信失敗' :
+                                     'テスト送信'}
+                                </button>
+                                {sendingStatus[webhook.id] === 'success' && <p className="text-green-600 text-sm mt-2 text-center">送信成功</p>}
+                                {sendingStatus[webhook.id] === 'error' && <p className="text-red-600 text-sm mt-2 text-center">送信失敗</p>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
         const TabButton = ({ children, isActive, onClick }) => {
             const activeClasses = "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-indigo-600 border-indigo-500";
             const inactiveClasses = "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300";
@@ -105,8 +229,8 @@
 
         const Tabs = ({ activeTab, onTabClick }) => {
             const TABS = [
+                { id: 'webhook-settings', label: 'Webhook' },
                 { id: 'device-info', label: 'デバイス情報' },
-                // { id: 'webhook-settings', label: 'Webhook' },
             ];
 
             return (
@@ -127,7 +251,7 @@
         };
 
         const SettingsPage = () => {
-            const [activeTab, setActiveTab] = React.useState('device-info');
+            const [activeTab, setActiveTab] = React.useState('webhook-settings');
 
             const handleTabClick = (tabId) => {
                 setActiveTab(tabId);
@@ -136,8 +260,8 @@
             return (
                 <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl">
                     <Tabs activeTab={activeTab} onTabClick={handleTabClick} />
+                    {activeTab === 'webhook-settings' && <WebhookSettings />}
                     {activeTab === 'device-info' && <DeviceInfo />}
-                    {/* {activeTab === 'webhook-settings' && <div>Webhook設定のコンテンツ</div>} */}
                 </div>
             );
         };

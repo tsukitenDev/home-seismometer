@@ -6,6 +6,7 @@ idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp"
                             "network/storage.cpp"
                             "network/wlan.cpp"
                             "network/httpd_suppl.cpp"
+                            "network/notification.cpp"
                             "network/rest_api.cpp"
                             "network/network.cpp"
                             "network/improv_wifi_aux.cpp"
@@ -21,6 +22,8 @@ idf_component_register(SRCS "home_seismometer_main.cpp" "sensor/adxl355.cpp"
                        REQUIRES sdk-cpp
                        REQUIRES esp_wifi
                        REQUIRES esp_http_server
+                       REQUIRES esp_http_client
+                       REQUIRES esp-tls # TLS機能 (証明書バンドル含む) を追加
                        REQUIRES lwip
                        REQUIRES fatfs)
 

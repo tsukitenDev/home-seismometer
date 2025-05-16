@@ -138,6 +138,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+void sntp_sync_time();
 
 static void ip_event_handler(void* arg, esp_event_base_t event_base,
   int32_t event_id, void* event_data)
@@ -152,6 +153,9 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Main DNS server : " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+
+        // IPアドレス取得後に時刻同期
+        sntp_sync_time();
     }
 }
 
@@ -487,11 +491,12 @@ void start_mdns_service()
 void wifi_init(){
   esp_log_level_set("wifi", ESP_LOG_WARN); 
 
+  sntp_init(TIME_ZONE, NTP_SERVER);
+
   wifi_init_sta();
   //wifi_scan();
 
-  sntp_init(TIME_ZONE, NTP_SERVER);
-  //sntp_sync_time();
+  // sntp_sync_time(); // IPアドレス取得後に変更
 
   start_mdns_service();
 
