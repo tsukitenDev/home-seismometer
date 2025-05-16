@@ -23,6 +23,7 @@ sdkconfig
 /memo*
 /test*
 
+.roo
 .cursor
 .cline
 
