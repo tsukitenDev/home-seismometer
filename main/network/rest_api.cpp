@@ -44,6 +44,10 @@ esp_err_t send_webhook_handler(httpd_req_t *req) {
     char buf[64];
     nlohmann::json resp_json;
 
+    // テスト用EarthquakeData
+    EarthquakeData test_data;
+    test_data.shindo = 3;
+
     size_t query_len = httpd_req_get_url_query_len(req) + 1;
     if (query_len > sizeof(buf)) {
         ESP_LOGE(TAG_API, "Query string too long: %d", query_len);
@@ -61,7 +65,7 @@ esp_err_t send_webhook_handler(httpd_req_t *req) {
             int webhook_id = atoi(param_val);
             ESP_LOGI(TAG_API, "Received send webhook request for ID: %d", webhook_id);
             
-            esp_err_t send_err = send_webhook_by_id(webhook_id);
+            esp_err_t send_err = send_webhook_by_id(webhook_id, test_data);
 
             if (send_err == ESP_OK) {
                 resp_json["status"] = "success";

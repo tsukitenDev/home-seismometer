@@ -3,7 +3,10 @@
 #include <esp_err.h>
 #include <string>
 #include <vector>
-#include "nlohmann/json.hpp"
+
+struct EarthquakeData {
+    int shindo;
+};
 
 struct WebhookSetting {
     int id;
@@ -11,8 +14,9 @@ struct WebhookSetting {
     int shindoThreshold;
     std::string name;
     std::string url;
-    nlohmann::json payloadTemplate;
+    std::string payloadTemplate;
 };
 
 std::vector<WebhookSetting> load_webhook_settings();
-esp_err_t send_webhook_by_id(int webhook_id);
+std::string process_template(const std::string& template_str, const EarthquakeData& earthquake_data);
+esp_err_t send_webhook_by_id(int webhook_id, const EarthquakeData& earthquake_data);
