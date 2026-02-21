@@ -3,15 +3,20 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
+#include "esp_system.h"
 
 static const char *TAG_NOTIFICATION = "notification";
+
+static constexpr int WEBHOOK_MAX_RETRIES = 3;
+static constexpr int WEBHOOK_RETRY_DELAY_MS = 2000;
+static constexpr int WEBHOOK_TIMEOUT_MS = 15000;
 
 std::vector<WebhookSetting> load_webhook_settings() {
     ESP_LOGD(TAG_NOTIFICATION, "Loading webhook settings");
     return {
         // id, enabled, shindoThreshold, name, url, payloadTemplate
-        {0, true, 30, "webhook-site", "https://webhook.site/b196cafb-e1b2-43c1-bb72-176cd682b809",
-         R"({"content": "地震を検知しました。震度: {{shindo}}")"},
+        {0, true, 30, "webhook-site", "https://webhook.site/f565fc53-489a-4c43-aa10-58df183c1621",
+         R"({"content": "地震を検知しました。震度: {{shindo}}"})"},
         {1, false, 50, "example", "https://example.com/webhook",
          R"({"content": "Earthquake detected"})"}
     };
@@ -116,43 +121,68 @@ esp_err_t send_webhook_by_id(int webhook_id, const EarthquakeData& earthquake_da
 
     std::string payload_str = process_template(target_setting->payloadTemplate, earthquake_data);
 
-    esp_http_client_config_t config = {
-        .url = target_setting->url.c_str(),
-        .method = HTTP_METHOD_POST,
-        .timeout_ms = 10000,
-        .event_handler = _webhook_http_event_handler,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .keep_alive_enable = false,
-    };
+    // 一度で送信成功しない場合を考慮して数回試行する
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL) {
-        ESP_LOGE(TAG_NOTIFICATION, "Failed to initialise HTTP client for webhook index %d", webhook_id);
-        return ESP_FAIL;
-    }
+    esp_err_t err = ESP_FAIL;
 
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_post_field(client, payload_str.c_str(), payload_str.length());
-
-    ESP_LOGI(TAG_NOTIFICATION, "Sending Webhook at index %d to %s", webhook_id, target_setting->url.c_str());
-    ESP_LOGD(TAG_NOTIFICATION, "Webhook Payload: %s", payload_str.c_str());
-
-    esp_err_t err = esp_http_client_perform(client);
-
-    if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG_NOTIFICATION, "Webhook at index %d: HTTP Status = %d, content_length = %lld",
-                 webhook_id,
-                 status_code,
-                 esp_http_client_get_content_length(client));
-        if (status_code < 200 || status_code >= 300) {
-            ESP_LOGW(TAG_NOTIFICATION, "Webhook at index %d sent, but received non-success status: %d", webhook_id, status_code);
-            err = ESP_FAIL;
+    for (int attempt = 0; attempt < WEBHOOK_MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+            ESP_LOGW(TAG_NOTIFICATION, "Retry %d/%d for webhook index %d",
+                     attempt, WEBHOOK_MAX_RETRIES - 1, webhook_id);
+            vTaskDelay(WEBHOOK_RETRY_DELAY_MS / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG_NOTIFICATION, "[diag] Free heap before retry: %lu",
+                     (unsigned long)esp_get_free_heap_size());
         }
-    } else {
-        ESP_LOGE(TAG_NOTIFICATION, "Failed to send webhook at index %d: %s", webhook_id, esp_err_to_name(err));
+
+        esp_http_client_config_t config = {
+            .url = target_setting->url.c_str(),
+            .method = HTTP_METHOD_POST,
+            .timeout_ms = WEBHOOK_TIMEOUT_MS,
+            .event_handler = _webhook_http_event_handler,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+            .keep_alive_enable = false,
+        };
+
+        esp_http_client_handle_t client = esp_http_client_init(&config);
+        if (client == NULL) {
+            ESP_LOGE(TAG_NOTIFICATION, "Failed to initialise HTTP client for webhook");
+            continue;
+        }
+
+        esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_post_field(client, payload_str.c_str(), payload_str.length());
+
+        ESP_LOGI(TAG_NOTIFICATION, "Sending Webhook at index %d to %s (attempt %d)",
+                 webhook_id, target_setting->url.c_str(), attempt + 1);
+        ESP_LOGD(TAG_NOTIFICATION, "Webhook Payload: %s", payload_str.c_str());
+
+        err = esp_http_client_perform(client);
+
+        if (err == ESP_OK) {
+            int status_code = esp_http_client_get_status_code(client);
+            ESP_LOGI(TAG_NOTIFICATION, "Webhook at index %d: HTTP Status = %d, content_length = %lld",
+                     webhook_id,
+                     status_code,
+                     esp_http_client_get_content_length(client));
+            if (status_code < 200 || status_code >= 300) {
+                ESP_LOGW(TAG_NOTIFICATION, "Webhook at index %d sent, but received non-success status: %d", webhook_id, status_code);
+                err = ESP_FAIL;
+            }
+        } else {
+            ESP_LOGE(TAG_NOTIFICATION, "Failed to send webhook at index %d (attempt %d): %s",
+                     webhook_id, attempt + 1, esp_err_to_name(err));
+        }
+
+        esp_http_client_cleanup(client);
+
+        if (err == ESP_OK) {
+            break;
+        }
     }
 
-    esp_http_client_cleanup(client);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_NOTIFICATION, "Webhook at index %d failed after %d attempts", webhook_id, WEBHOOK_MAX_RETRIES);
+    }
+
     return err;
 }
