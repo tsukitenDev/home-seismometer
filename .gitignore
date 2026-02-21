@@ -23,9 +23,11 @@ sdkconfig
 /memo*
 /test*
 
+.github/instructions
 .roo
 .cursor
 .cline
+
 
 .DS_Store
 .vscode
