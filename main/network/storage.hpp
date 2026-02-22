@@ -6,8 +6,10 @@
 //#include "esp_vfs_fat.h"
 
 extern const char *base_path;
+extern const char *userdata_path;
 
 esp_err_t init_fs();
+esp_err_t init_userdata_fs();
 
 
 

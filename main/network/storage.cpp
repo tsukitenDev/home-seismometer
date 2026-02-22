@@ -13,9 +13,11 @@ static const char *TAG = "storage";
 
 // Mount path for the partition
 const char *base_path = "/spiflash";
+const char *userdata_path = "/userdata";
 
 // Handle of the wear levelling library instance
 static wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
+static wl_handle_t s_wl_handle_userdata = WL_INVALID_HANDLE;
 
 
 #if CONFIG_WEB_DEPLOY_SEMIHOST
@@ -53,3 +55,19 @@ esp_err_t init_fs(){
   return ESP_OK;
 }
 #endif
+
+esp_err_t init_userdata_fs() {
+    ESP_LOGI(TAG, "Mounting userdata FAT filesystem");
+    const esp_vfs_fat_mount_config_t mount_config = {
+        .format_if_mount_failed = true,
+        .max_files = 4,
+        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE,
+    };
+
+    esp_err_t err = esp_vfs_fat_spiflash_mount_rw_wl(userdata_path, "userdata", &mount_config, &s_wl_handle_userdata);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to mount userdata FATFS (%s)", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}

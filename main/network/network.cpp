@@ -296,6 +296,7 @@ void ws_send_data(std::string tag, std::vector<std::tuple<int64_t, T>>& data, ui
 
 void httpd_init(){
     init_fs();
+    init_userdata_fs();
     //initi_web_page_buffer();
     server_handle = start_webserver();
     return;
