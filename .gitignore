@@ -13,6 +13,7 @@ sdkconfig
 /sdkconfig?*
 !/sdkconfig_eqis1
 !/sdkconfig_cyd
+!/sdkconfig_cyd-lsm6dso
 
 #components
 /managed_components

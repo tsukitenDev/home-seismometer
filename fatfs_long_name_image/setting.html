@@ -94,7 +94,13 @@
         };
 
         const TEMPLATE_VARIABLES = [
-            { key: 'shindo', label: '震度', example: '5弱(4.7)' },
+            { key: 'is_test', label: 'テスト区分', example: '【テスト】' },
+            { key: 'type', label: '通知区分（新規検知/震度更新）', example: '新規検知' },
+            { key: 'shindo_class', label: '震度階級', example: '5弱' },
+            { key: 'shindo', label: '計測震度', example: '4.7' },
+            { key: 'date', label: '検知日付', example: '2026-02-23' },
+            { key: 'time', label: '検知時刻', example: '14:05:32' },
+            { key: 'report_num', label: '通知カウント', example: '1' },
         ];
 
         const getPreviewText = (template) => {

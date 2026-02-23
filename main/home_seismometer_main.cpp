@@ -40,12 +40,14 @@
 #include "task_ws_send.hpp"
 #include "task_seis_fft.hpp"
 
+#include "network/notification.hpp"
+
 #include "board_def.hpp"
 
 
 static const std::string firmware_version = "v0.1.3";
 
-static constexpr uint32_t LONG_BUF_SIZE = 8192; 
+static constexpr uint32_t LONG_BUF_SIZE = 8192;
 
 
 ringBuffer<std::tuple<int64_t, std::array<float, 3>>> raw_acc_buffer(LONG_BUF_SIZE);
@@ -63,29 +65,44 @@ uint32_t ws_send_period = 20;
 
 
 // LovyanGFX
-#if BOARD_355_1732S019
+#if BOARD_355_1732S019 | BOARD_LSM6DSO_1732S019
 static LGFX_1732S019_ST7789 lcd;
 const static uint8_t LCD_ROTATION = 1;
-static int32_t shindo_threshold = 5;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "CYD";
-static std::string sensor_name = "ADXL355";
 static std::string mdns_hostname =  "adxl";
 static std::string mdns_instancename =  "CYD ESP32 Webserver";
 static std::string monitor_url = "adxl.local/monitor";
 
-#elif BOARD_EQIS1
+#elif BOARD_EQIS1 | BOARD_LSM6DSO_XIAO
 static LGFX_EQIS1_SSD1306 lcd;
 const static uint8_t LCD_ROTATION = 2;
-static int32_t shindo_threshold = 15;
 static std::string firmware_name = "home-seismometer";
 static std::string device_name = "EQIS-1";
-static std::string sensor_name = "LSM6DSO";
 static std::string mdns_hostname =  "eqis-1";
 static std::string mdns_instancename =  "EQIS-1 ESP32 Webserver";
 static std::string monitor_url = "eqis-1.local/monitor";
 
 #endif
+
+
+#if BOARD_355_1732S019
+static std::string sensor_name = "ADXL355";
+static int32_t shindo_threshold = 5;
+
+#elif BOARD_LSM6DSO_1732S019
+static std::string sensor_name = "LSM6DSO";
+static int32_t shindo_threshold = 10;
+
+#elif BOARD_EQIS1
+static std::string sensor_name = "LSM6DSO";
+static int32_t shindo_threshold = 20;
+
+#elif BOARD_LSM6DSO_XIAO
+static std::string sensor_name = "LSM6DSO";
+static int32_t shindo_threshold = 20;
+#endif
+
 
 device_info_t device_info = {
     .firmware_name = firmware_name,
@@ -122,7 +139,7 @@ void print_heap_info(){
                             (info_internal.total_free_bytes + info_internal.total_allocated_bytes) / 1024,
                             100 * info_internal.total_allocated_bytes / (info_internal.total_free_bytes + info_internal.total_allocated_bytes),
                             info_internal.largest_free_block / 1024);
-    
+
     ESP_LOGI("heap", "PSRAM %d / %d kB (%d %% used), MAX %d kB",
                             info_psram.total_allocated_bytes / 1024,
                             (info_psram.total_free_bytes + info_psram.total_allocated_bytes) / 1024,
@@ -147,7 +164,7 @@ void task_display(void * pvParameters){
     std::string sensor_status;
     std::string seis_status;
     WIFI_STATE wifi_current_state;
-    
+
     int display_intensity = 0;
     std::string shindo_text;
 
@@ -260,8 +277,8 @@ void task_display(void * pvParameters){
             if(wifi_current_state == WIFI_STATE::CONNECTED){
                 canvas.printf("%s\n", monitor_url.c_str());
             }else{
-                canvas.printf("WiFi : %s\n", wifi_status.c_str());                
-            } 
+                canvas.printf("WiFi : %s\n", wifi_status.c_str());
+            }
             canvas.setCursor(0, canvas.height() - canvas.fontHeight() * 2 - 6);
             canvas.printf(" Seismic\n Intensity");
             // 過去の震度を表示しているときは*マークを表示
@@ -276,7 +293,7 @@ void task_display(void * pvParameters){
             canvas.printf("%c", shindo_text[1]);
             // フリーズ確認
             if((cnt / 100) % 2 == 1) canvas.drawPixel(canvas.width() - 1, canvas.height() - 1, TFT_WHITE);
-            
+
             canvas.pushSprite(0, 0);
 
         }else if(display_mode == 2) {
@@ -295,6 +312,107 @@ void task_display(void * pvParameters){
 }
 
 
+
+
+/**
+ * 震度に応じてWebhook通知を送信する
+ * display taskと同様にshindo_historyから震度を取得する
+ */
+struct WebhookNotifyState {
+    bool is_shaking = false;
+    bool is_notifying = false;
+    int32_t notified_intensity = 0;
+    int64_t shake_start_time = 0;
+    int64_t last_notify_time = 0;
+    int32_t notify_count = 0;
+};
+
+void task_webhook_notify(void * pvParameters){
+    static const char *TAG = "webhook-notify";
+
+    static constexpr int CHECK_INTERVAL_MS = 1000;
+    // 再通知の震度上昇幅
+    static constexpr int INTENSITY_INCREASE_THRESHOLD = 5;
+    // 再通知判定間隔
+    static constexpr int64_t NOTIFY_COOLDOWN_US = 10LL * 1000 * 1000;
+
+    WebhookNotifyState wh_state[WEBHOOK_MAX_COUNT];
+
+    init_webhook_settings();
+    ESP_LOGI(TAG, "Webhook notify task started");
+
+    bool is_shaking = false;
+    int64_t shaking_start_time = 0;
+
+    while(1) {
+        // polling
+        // webhook送信に時間かかるので、前回送信終了からDelayとする
+        vTaskDelay(CHECK_INTERVAL_MS / portTICK_PERIOD_MS);
+
+        if(seis_state != SEISMOMETER_STATE::SHINDO_STABILIZED) continue;
+        if(wifi_get_state() != WIFI_STATE::CONNECTED) continue;
+
+        int64_t cnt = last_cnt;
+        int32_t intensity_int10x = static_cast<int32_t>(std::get<1>(shindo_history[cnt]));
+        int64_t now = esp_timer_get_time();
+
+        // 揺れ検知
+        if(intensity_int10x >= shindo_threshold) {
+            is_shaking = true;
+            shaking_start_time = now;
+        }else if(intensity_int10x < shindo_threshold - 5) {
+            is_shaking = false;
+        }
+
+        for(int i = 0; i < WEBHOOK_MAX_COUNT; i++) {
+            WebhookSetting setting = get_webhook_setting(i);
+            if(!setting.enabled || setting.url.empty()) {
+                wh_state[i].is_notifying = false;
+                continue;
+            }
+
+            // センサー閾値未満 → 揺れ終了
+            if(!is_shaking) {
+                wh_state[i].is_notifying = false;
+                continue;
+            }
+
+            bool should_notify = false;
+
+            if(is_shaking &&  intensity_int10x >= setting.shindoThreshold) {
+                if(!wh_state[i].is_notifying){
+                    wh_state[i].is_notifying = true;
+                    wh_state[i].last_notify_time = now;
+                    wh_state[i].notified_intensity = intensity_int10x;
+                    wh_state[i].notify_count = 1;
+                    // 送信フラグを立てる
+                    should_notify = true;
+                }else{
+                    if(intensity_int10x >= wh_state[i].notified_intensity + INTENSITY_INCREASE_THRESHOLD
+                        && now - wh_state[i].last_notify_time >= NOTIFY_COOLDOWN_US) {
+                        // 震度更新
+                        wh_state[i].notified_intensity = intensity_int10x;
+                        wh_state[i].last_notify_time = now;
+                        wh_state[i].notify_count++;
+                        // 送信フラグを立てる
+                        should_notify = true;
+                    }
+                }
+            }
+
+            if(!should_notify) continue;
+
+            EarthquakeData eq_data = {
+                .time_shake_start = shaking_start_time,
+                .report_count = wh_state[i].notify_count,
+                .shindo = intensity_int10x,
+                .is_test = false
+            };
+            ESP_LOGI(TAG, "Sending webhook[%d]",i);
+            send_webhook_by_index(i, eq_data);
+        }
+    }
+}
 
 
 extern "C" void app_main(void)
@@ -343,9 +461,9 @@ extern "C" void app_main(void)
 
     create_task_result = xTaskCreatePinnedToCore(task_process_shindo_fft, "process shindo", 4096, NULL, 5, NULL, 1);
     if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
-    
+
     xEventGroupWaitBits(s_shindo_fft_event_group, BIT_TASK_PROCESS_SHINDO_READY, pdFALSE, pdFALSE, portMAX_DELAY);
-    
+
     // 無線LAN 初期設定
     wifi_init();
     httpd_init();
@@ -355,6 +473,10 @@ extern "C" void app_main(void)
     create_task_result = xTaskCreatePinnedToCore(task_improv, "Task improv serial", 8192, NULL, 5, NULL, 0);
     if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
+
+    // Webhook通知タスク（httpd_init後に生成: userdata FSマウント済み）
+    create_task_result = xTaskCreatePinnedToCore(task_webhook_notify, "webhook notify", 8192, NULL, 2, NULL, 0);
+    if (create_task_result != pdPASS) ESP_LOGI("task", "Failed to create task%d", create_task_result);
 
     // websocket 送信開始
     que_bufCount = xQueueCreate(8, 10);

@@ -88,7 +88,10 @@ esp_err_t send_webhook_handler(httpd_req_t *req) {
 
     // テスト用EarthquakeData
     EarthquakeData test_data;
-    test_data.shindo = 3;
+    test_data.time_shake_start = time(nullptr);
+    test_data.report_count = 1;
+    test_data.shindo = 35;
+    test_data.is_test = true;
 
     std::string payload_str = process_template(payload_template, test_data);
     ESP_LOGI(TAG_API, "Test sending webhook to %s", url.c_str());

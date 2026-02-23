@@ -37,7 +37,7 @@ static nlohmann::json webhook_setting_to_json(const WebhookSetting& s) {
 WebhookSetting get_default_webhook_setting() {
     // enabled, shindoThreshold, name, url, payloadTemplate
     return {false, 35, "未設定", "",
-         R"({"content": "揺れを検知しました。震度: {{shindo}}"})"};
+         R"({"content": "{{is_test}}【{{type}}】揺れを検知しました。\n震度: {{shindo_class}}({{shindo}})\n検知時刻: {{date}} {{time}}"})"};
 }
 
 
@@ -193,54 +193,74 @@ static esp_err_t save_webhook_settings() {
     return ESP_OK;
 }
 
-std::string shindo_to_str(int shindo) {
-    std::string shindo_text;
+std::string shindo_class_str(int shindo) {
+    if (shindo < 5)  return "0以下";
+    if (shindo < 15) return "1";
+    if (shindo < 25) return "2";
+    if (shindo < 35) return "3";
+    if (shindo < 45) return "4";
+    if (shindo < 50) return "5弱";
+    if (shindo < 55) return "5強";
+    if (shindo < 60) return "6弱";
+    if (shindo < 65) return "6強";
+    return "7";
+}
 
-    // 震度階級
-    if (shindo < 5) {
-        shindo_text = "0以下";
-    } else if (shindo < 15) {
-        shindo_text = "1";
-    } else if (shindo < 25) {
-        shindo_text = "2";
-    } else if (shindo < 35) {
-        shindo_text = "3";
-    } else if (shindo < 45) {
-        shindo_text = "4";
-    } else if (shindo < 50) {
-        shindo_text = "5弱";
-    } else if (shindo < 55) {
-        shindo_text = "5強";
-    } else if (shindo < 60) {
-        shindo_text = "6弱";
-    } else if (shindo < 65) {
-        shindo_text = "6強";
-    } else {
-        shindo_text = "7";
-    }
-
-    // 計測震度
-    shindo_text += "(";
-    if(shindo < 0){
-        shindo_text += "-";
+std::string shindo_raw_str(int shindo) {
+    std::string result;
+    if (shindo < 0) {
+        result += "-";
         shindo *= -1;
     }
-    shindo_text += std::to_string(shindo / 10);
-    shindo_text += ".";
-    shindo_text += std::to_string(shindo % 10);
-    shindo_text += ")";
+    result += std::to_string(shindo / 10);
+    result += ".";
+    result += std::to_string(shindo % 10);
+    return result;
+}
 
-    return shindo_text;
+static std::string replace_all(const std::string& src, const std::string& placeholder, const std::string& value) {
+    std::string result = src;
+    size_t pos = 0;
+    while ((pos = result.find(placeholder, pos)) != std::string::npos) {
+        result.replace(pos, placeholder.length(), value);
+        pos += value.length();
+    }
+    return result;
 }
 
 std::string process_template(const std::string& template_str, const EarthquakeData& earthquake_data) {
     std::string result = template_str;
-    std::string shindo_str = shindo_to_str(earthquake_data.shindo);
-    size_t pos = 0;
-    while ((pos = result.find("{{shindo}}", pos)) != std::string::npos) {
-        result.replace(pos, 10, shindo_str);
-        pos += shindo_str.length();
+
+    // {{shindo}} : 計測震度（例: "3.8"）
+    result = replace_all(result, "{{shindo}}", shindo_raw_str(earthquake_data.shindo));
+
+    // {{shindo_class}} : 震度階級（例: "4", "5弱"）
+    result = replace_all(result, "{{shindo_class}}", shindo_class_str(earthquake_data.shindo));
+
+    // {{date}} : 検知日付（例: "2026-02-23"）
+    // {{time}} : 検知時刻（例: "14:05:32"）
+    {
+        struct tm tm_buf;
+        localtime_r(&earthquake_data.time_shake_start, &tm_buf);
+        char date_str[16];
+        strftime(date_str, sizeof(date_str), "%Y-%m-%d", &tm_buf);
+        result = replace_all(result, "{{date}}", date_str);
+
+        char time_str[16];
+        strftime(time_str, sizeof(time_str), "%H:%M:%S", &tm_buf);
+        result = replace_all(result, "{{time}}", time_str);
     }
+
+    // {{type}} : 通知区分（"新規検知" or "震度更新"）
+    result = replace_all(result, "{{type}}",
+        earthquake_data.report_count <= 1 ? "新規検知" : "震度更新");
+
+    // {{report_num}} : 第何報
+    result = replace_all(result, "{{report_num}}", std::to_string(earthquake_data.report_count));
+
+    // {{is_test}} : テスト送信なら"【テスト】"、本番なら空文字列
+    result = replace_all(result, "{{is_test}}",
+        earthquake_data.is_test ? "【テスト】" : "");
 
     return result;
 }

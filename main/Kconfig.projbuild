@@ -24,8 +24,12 @@ menu "Example Configuration"
             bool "None"
         config SEIS_BOARD_EQIS1
             bool "EQIS-1, LSM6DSO"
+        config SEIS_BOARD_LSM6DSO_XIAO
+            bool "XIAO ESP32S3, LSM6DSO"
         config SEIS_BOARD_355_1732S019
             bool "ESP32-1732S019(CYD), ADXL355"
+        config SEIS_BOARD_LSM6DSO_1732S019
+            bool "ESP32-1732S019(CYD), LSM6DSO"
     endchoice
 
     choice ESP_WIFI_SAE_MODE
