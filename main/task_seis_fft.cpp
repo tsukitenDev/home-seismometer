@@ -35,8 +35,9 @@ extern QueueHandle_t que_process_shindo;
 extern QueueHandle_t que_shindo_res;
 
 
-extern uint32_t ws_send_period;
-const uint32_t fft_calc_period = 100;
+extern const uint32_t WS_SEND_PERIOD;
+extern const uint32_t WS_SEND_OFFSET;
+const uint32_t FFT_CALC_PERIOD = 100;
 
 SENSOR_STATE acc_sensor_state = SENSOR_STATE::NOT_CONNECTED;
 
@@ -72,10 +73,10 @@ void task_process_shindo_fft(void * pvParameters){
         //int64_t st_a = esp_timer_get_time();
 
         int32_t res = processor.calc(cnt);
-        
+
         //int64_t st_b = esp_timer_get_time();
         //ESP_LOGW("shindo", "complete 3 FFT in %'lldus", st_b - st_a);
-        
+
         xQueueSend(que_shindo_res, &res, 0);
     }
 }
@@ -89,11 +90,11 @@ void task_acc_read_fft(void * pvParameters){
     #if SENSOR_ADXL355
     ADXL355 sensor;
     bool ret_sensor_init = sensor.init(SPI2_HOST, PIN_NUM_CS);
-    
+
     #elif SENSOR_LSM6DSO
     LSM6DSO sensor;
     bool ret_sensor_init = sensor.init(SPI2_HOST, PIN_NUM_CS);
-    
+
     #endif
 
     if(ret_sensor_init) acc_sensor_state = SENSOR_STATE::CONNECTED;
@@ -113,7 +114,6 @@ void task_acc_read_fft(void * pvParameters){
     int32_t intensity_int10x = -20;
 
 
-    
     seis_state = SEISMOMETER_STATE::HPF_STABILIZING;
     ESP_LOGI(TAG, "START");
 
@@ -122,10 +122,10 @@ void task_acc_read_fft(void * pvParameters){
 
         auto res = processer.read();
         cnt = res.cnt;
-        
+
         // 履歴保存
         raw_acc_buffer[cnt] = {now, res.gal_raw};
-        hpf_acc_buffer[cnt] = {now, res.gal_hpf}; 
+        hpf_acc_buffer[cnt] = {now, res.gal_hpf};
 
         int32_t fft_res_intensity;
         BaseType_t shindo_fft_res = xQueueReceive(que_shindo_res, &fft_res_intensity, 0);
@@ -145,35 +145,32 @@ void task_acc_read_fft(void * pvParameters){
             shindo_history[cnt] = {now, intensity_int10x};
         }
 
-        
         if(seis_state == SEISMOMETER_STATE::SHINDO_STABILIZING ||
            seis_state == SEISMOMETER_STATE::SHINDO_STABILIZED){
-            if(cnt % fft_calc_period == 0){
+            if(cnt % FFT_CALC_PERIOD == 0){
                 //int64_t diff = esp_timer_get_time() - last_read // 10,000us→10ms
                 ESP_LOGI(TAG, "shindo: %.1f", (double)intensity_int10x / 10);
             }
-            if(cnt % ws_send_period == 0){
+            if(cnt % WS_SEND_PERIOD == WS_SEND_OFFSET){
                 // websocket 送信
                 xQueueSend(que_bufCount, &cnt, 0);
             }
         }
         else {
-            if(cnt % fft_calc_period == 0) {
+            if(cnt % FFT_CALC_PERIOD == 0) {
                 ESP_LOGI(TAG, "%lld, X %6.1fgal, Y %6.1fgal  Z %6.1fgal",
                                 cnt,
                                 res.gal_hpf[0],
                                 res.gal_hpf[1],
                                 res.gal_hpf[2]);
-                
-                
             }
-            if(cnt % ws_send_period == 0) {
+            if(cnt % WS_SEND_PERIOD == WS_SEND_OFFSET) {
                 // websocket 送信
                 xQueueSend(que_bufCount, &cnt, 0);
             }
         }
         if(res.is_stabilized){
-            if(cnt % fft_calc_period == 0){
+            if(cnt % FFT_CALC_PERIOD == 0){
                 xQueueSend(que_process_shindo, &cnt, 0);
             }
         }

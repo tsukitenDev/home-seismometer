@@ -58,8 +58,15 @@ ringBuffer<std::tuple<int64_t, float>> shindo_history(LONG_BUF_SIZE);
 
 QueueHandle_t que_bufCount;
 
-uint32_t ws_send_period = 20;
+#if BOARD_EQIS1 | BOARD_LSM6DSO_XIAO
+extern const uint32_t WS_SEND_PERIOD = 200;
+extern const uint32_t WS_SEND_OFFSET = 51;
+#else
+extern const uint32_t WS_SEND_PERIOD = 100;
+extern const uint32_t WS_SEND_OFFSET = 51;
+#endif
 
+static_assert(WS_SEND_OFFSET < WS_SEND_PERIOD);
 
 
 

@@ -60,8 +60,6 @@ httpd_uri_t root = {
 
 esp_err_t get_monitor_handler(httpd_req_t * req) {
     httpd_resp_sendfile(req, "/spiflash/monitor.html");
-    //httpd_resp_send(req, monitor_html, HTTPD_RESP_USE_STRLEN);
-
     return ESP_OK;
 }
 
@@ -143,12 +141,12 @@ esp_err_t httpd_ws_send_frame_to_all_clients(httpd_ws_frame_t* ws_pkt) {
 
 esp_err_t get_csv_file_handler(httpd_req_t *req) {
     const char *TAG = "CSV_FILE";
-    
+
     // URLからファイル名を取得
     char filepath[FILE_PATH_MAX];
     const char *uri_path = req->uri;
     const char *filename = NULL;
-    
+
     // URIが有効か確認
     if (uri_path != NULL && strlen(uri_path) > sizeof("/csv/")) {
         filename = uri_path + sizeof("/csv/") - 1;
@@ -161,11 +159,11 @@ esp_err_t get_csv_file_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
     */
-    
+
     // ファイルパスを構築
     snprintf(filepath, sizeof(filepath), "/spiflash/data/%s", filename);
-    
-    
+
+
     // Content-Dispositionヘッダーを追加してダウンロードを促す
     char attachment[100];
     snprintf(attachment, sizeof(attachment), "attachment; filename=\"%s\"", filename);
@@ -217,7 +215,7 @@ httpd_handle_t start_webserver(void)
         register_rest_api_handlers(server);
 
         httpd_register_uri_handler(server, &csv_file);
-        
+
         return server;
     }
 
@@ -293,7 +291,6 @@ void ws_send_data(std::string tag, std::vector<std::tuple<int64_t, T>>& data, ui
 void httpd_init(){
     init_fs();
     init_userdata_fs();
-    //initi_web_page_buffer();
     server_handle = start_webserver();
     return;
 }

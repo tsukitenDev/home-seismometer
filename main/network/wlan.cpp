@@ -23,6 +23,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "../board_def.hpp"
+
 #include "device_info.hpp"
 
 
@@ -77,8 +79,14 @@ static const char *TAG = "wifi station";
 
 
 
-// actual power: tx_power * 4 dBm
-static int8_t tx_power = 48; // 12 dBm
+// tx_power = actual_power * 4 dBm
+// tx_power range: [8-84]
+// actual_power range: [2-20] dBm
+#if BOARD_EQIS1 | BOARD_LSM6DSO_XIAO
+static const int8_t tx_power = 20;
+#else
+static const int8_t tx_power = 66;
+#endif
 
 
 
