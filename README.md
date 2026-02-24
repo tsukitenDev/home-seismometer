@@ -9,6 +9,7 @@ ESP32用のWeb UIを備えた地震計ファームウェア
 - [x] 計測震度の表示 (ボード組み込み画面) 
 - [x] 加速度波形・計測震度のリアルタイム表示 (Web UI)
 - [ ] 地震履歴の保存、表示
+- [x] 揺れを通知 (Webhook)
 - [x] シリアル経由のWiFiプロビジョニング ([Improv Wi-Fi](https://www.improv-wifi.com/))
 
 震度：
