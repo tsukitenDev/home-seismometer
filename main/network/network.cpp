@@ -44,6 +44,19 @@
 
 
 
+esp_err_t get_root_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, "<html><head><meta http-equiv=\"refresh\" content=\"0;url=/monitor\"></head></html>", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+httpd_uri_t root = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = get_root_handler,
+    .user_ctx  = NULL
+};
+
 
 esp_err_t get_monitor_handler(httpd_req_t * req) {
     httpd_resp_sendfile(req, "/spiflash/monitor.html");
@@ -74,25 +87,7 @@ httpd_uri_t setting = {
 };
 
 
-/*
-esp_err_t get_handler(httpd_req_t *req)
-{
 
-    httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, "<h1>Hello World!</h1>", HTTPD_RESP_USE_STRLEN);
-
-    return ESP_OK;
-}
-
-char userctx[] = "Hello World!";
-httpd_uri_t hello = {
-        .uri       = "/hello",  // Match all URIs of type /path/to/file
-    	.method    = HTTP_GET,
-    	.handler   = get_handler,
-        .user_ctx = userctx
-};
-
-*/
 
 httpd_handle_t server_handle;
 
@@ -216,6 +211,7 @@ httpd_handle_t start_webserver(void)
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &ws);
+        httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &monitor);
         httpd_register_uri_handler(server, &setting);
         register_rest_api_handlers(server);
