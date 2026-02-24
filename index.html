@@ -108,7 +108,7 @@
         <li>
           画面の指示に従ってインストールとWi-Fiの設定を行います。
           <br>ファームウェアを書き込むとNVS領域が削除されます。以前デバイスでWi-Fiを使用していた場合でも再度設定が必要です。
-          Wi-Fiの設定画面が表示されないときは、一度USBケーブルを抜いて再接続を行ってください。
+          Wi-Fiの設定画面が表示されないときは、一度USBケーブルを抜いて再接続します。
         </li>
         <li>
           Wi-Fi接続完了後、"Visit Device"を選択するとWeb UIに遷移します。
@@ -122,16 +122,16 @@
       <p>Select a device to install the firmware.</p>
       <ul class="radios">
         <li>
-          <label><input type="radio" name="type" value="v0.1.3/cyd-v0.1.3" checked/> v0.1.3 EQIS-1 (XIAO ESP32S3, LSM6DSO)</label>
+          <label><input type="radio" name="type" value="v0.2.0/cyd-v0.2.0" checked/> v0.2.0 EQIS-1 (XIAO ESP32S3, LSM6DSO)</label>
         </li>
         <li>
-          <label><input type="radio" name="type" value="v0.1.3/eqis1-v0.1.3"/> v0.1.3 CYD (S3-WROOM-1-N16R8, ADXL355)</label>
+          <label><input type="radio" name="type" value="v0.2.0/eqis1-v0.2.0"/> v0.2.0 CYD (S3-WROOM-1-N16R8, ADXL355)</label>
         </li>
       </ul>
       <p class="button-row" align="center">
         <esp-web-install-button
         install-supported
-        manifest="./v0.1.3/eqis1-v0.1.3-manifest.json"
+        manifest="./v0.2.0/eqis1-v0.2.0-manifest.json"
         ></esp-web-install-button>
       </p>
       <h2>インストール 対応ブラウザ</h2>
@@ -162,6 +162,8 @@
         radio.addEventListener("change", () => {
           const button = document.querySelector('esp-web-install-button');
           button.manifest = `./${radio.value}-manifest.json`;
+          //動作に影響しないが、確認のため
+          button.setAttribute('manifest', `./${radio.value}-manifest.json`);
           button.classList.remove('invisible');
         }
       ));
