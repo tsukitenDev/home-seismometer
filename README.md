@@ -38,6 +38,19 @@ https://tsukitendev.github.io/home-seismometer/
 
 (Web Serial APIの許可が必要です)
 
+## ビルド
+
+ESP-IDF v5.4.0以上
+
+```bash
+git clone --recursive https://github.com/tsukitenDev/home-seismometer.git
+cd home-seismometer
+cp sdkconfig_cyd sdkconfig.defaults
+# 以下、idf.pyが通る環境
+idf.py set-target esp32s3
+idf.py build
+```
+
 
 ## 画面説明
 ### 状態表示画面
