@@ -22,7 +22,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.4.1
+    version: 5.4.0
   johboh/nlohmann-json:
     component_hash: 2a97e10124d755da820b0381e36a9a6504574328f262964ccea3f8b2f228fc66
     dependencies:

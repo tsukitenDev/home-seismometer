@@ -337,7 +337,7 @@ struct WebhookNotifyState {
 void task_webhook_notify(void * pvParameters){
     static const char *TAG = "webhook-notify";
 
-    static constexpr int CHECK_INTERVAL_MS = 1000;
+    static constexpr int CHECK_INTERVAL_MS = 2000;
     // 再通知の震度上昇幅
     static constexpr int INTENSITY_INCREASE_THRESHOLD = 5;
     // 再通知判定間隔
@@ -349,7 +349,7 @@ void task_webhook_notify(void * pvParameters){
     ESP_LOGI(TAG, "Webhook notify task started");
 
     bool is_shaking = false;
-    int64_t shaking_start_time = 0;
+    time_t shaking_start_time = 0;
 
     while(1) {
         // polling
@@ -366,7 +366,7 @@ void task_webhook_notify(void * pvParameters){
         // 揺れ検知
         if(intensity_int10x >= shindo_threshold) {
             is_shaking = true;
-            shaking_start_time = now;
+            time(&shaking_start_time);
         }else if(intensity_int10x < shindo_threshold - 5) {
             is_shaking = false;
         }
@@ -380,13 +380,14 @@ void task_webhook_notify(void * pvParameters){
 
             // センサー閾値未満 → 揺れ終了
             if(!is_shaking) {
+                if(wh_state[i].is_notifying) ESP_LOGI(TAG, "Shaking subsided. End notify.");
                 wh_state[i].is_notifying = false;
                 continue;
             }
 
             bool should_notify = false;
 
-            if(is_shaking &&  intensity_int10x >= setting.shindoThreshold) {
+            if(is_shaking && intensity_int10x >= setting.shindoThreshold) {
                 if(!wh_state[i].is_notifying){
                     wh_state[i].is_notifying = true;
                     wh_state[i].last_notify_time = now;
